@@ -1,7 +1,7 @@
 #include "Serene_Game.h"
 #include "Serene_Intrinsics.h"
 #include "Serene_Math.h"
-#include "Serene_Tiles.cpp"
+
 
 // The game layer is currently only responsible for filling the sound buffer
 // Sound play and update is managed by the OS
@@ -49,7 +49,6 @@ internal void DrawRectangle(GameBackBuffer* Buffer, v2 MinPos, v2 MaxPos,
 		IntegerMaxY = Buffer->BitmapHeight;	
 	}
     
-	
     // AA RR GG BB
 	// Alpha is 24 bits to the left (not used)
 	// Red is 16 bits to the left
@@ -78,36 +77,69 @@ internal void DrawRectangle(GameBackBuffer* Buffer, v2 MinPos, v2 MaxPos,
 	}
 }
 
+#define PushStruct(Arena, type) (type *)PushSize_(Arena, sizeof(type))
+#define PushArray(Arena, Count, type) (type *)PushSize_(Arena, (Count)*sizeof(type))
+void *
+PushSize_(MemoryArena *arena, MemoryIndex size)
+{
+    Assert((arena->Used + size) <= arena->Size); // Don't overflow your arena
+    void *Result = arena->Base + arena->Used; // Retrieve a pointer to the latest memory index before adding the memory
+   	arena->Used += size; // add the new size to our index
+    
+    return(Result);
+}
+
+#include "Serene_Tiles.cpp"
 
 extern "C" GAME_UPDATE(GameUpdate)
 {
-#define TILE_WIDTH_COUNT 16
-#define TILE_HEIGHT_COUNT 9
-#define TILE_WIDTH  60
-#define TILE_HEIGHT  60
-
-	   	// 9 rows, 16 columns
+	#if 1
+	// 9 rows, 16 columns
 	local_persist u32 TileChunk00[256][256] = 
 	{
-        {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
-        {1, 1, 0, 0,  0, 1, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 1, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {0, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {1, 1, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 1, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 1, 1, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 1, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
-        {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
-        {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1,  1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 1},
-        {1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  0, 1, 1, 1,  1, 1, 1, 1, 1},
+        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
+        {2, 2, 1, 1,  1, 2, 1, 1,  1, 1, 1, 1,  1, 2, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 2, 1, 1,  1, 1, 1, 1,  2, 1, 1, 1,  1, 1, 2, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  2, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {1, 1, 1, 1,  1, 2, 1, 1,  2, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+        {2, 2, 1, 1,  1, 2, 1, 1,  2, 1, 1, 1,  1, 2, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 2, 1, 1,  2, 1, 1, 1,  2, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 2, 2, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 2, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
+        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
 	};
+
+	#else
+		local_persist u32 TileChunk00[256][256] = 
+	{
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
+	};
+	#endif
 
 	// Memory
 	Assert(sizeof(GameState) <= Memory->PermanentStorageSize);
@@ -135,24 +167,9 @@ extern "C" GAME_UPDATE(GameUpdate)
 		tile_map->ChunkCountY = 32;
 		tile_map->TileChunks = PushArray(&State->WorldArena, tile_map->ChunkCountX * tile_map->ChunkCountY, TileChunk);
 
-		for(i32 Y = 0;
-			Y < tile_map->ChunkCountY;
-			++Y)
-			{
-				for (i32 X = 0;
-					 X < tile_map->ChunkCountX;
-					 ++X)
-					 {
-						 tile_map->TileChunks[Y * tile_map->ChunkCountX + X].Data =
-						 PushArray(&State->WorldArena, tile_map->ChunkDimm * tile_map->ChunkDimm, u32);
-					 }
-			}
-
 		tile_map->TileWidthInMeters = 1.4f;
 		tile_map->TileWidthInPixels = 60;
 		tile_map->MetersToPixels = (f32)tile_map->TileWidthInPixels / (f32)tile_map->TileWidthInMeters;
-		tile_map->WidthCount = TILE_WIDTH_COUNT;
-		tile_map->HeightCount = TILE_HEIGHT_COUNT;
 
 		// The origin of the world is designed to be at the bottom left
 		// This means the x origin remains the same
@@ -160,11 +177,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 		// the bottom left is the top left offset by the bitmap height
 		// This is because the OS creates a buffer that starts at the top left 
 		tile_map->Origin = {0.0f, (f32)BackBuffer->BitmapHeight};
-		tile_map->TileWidth =  TILE_WIDTH;
-		tile_map->TileHeight =  TILE_HEIGHT;
 
-		// TileChunk chunk;
-		// chunk.Data = (u32*)TileChunk00;	
 		// State
 		State->PlayerPos.TileX = 3;
 		State->PlayerPos.TileY = 3;
@@ -179,8 +192,13 @@ extern "C" GAME_UPDATE(GameUpdate)
 				    X < 256;
 					++X)
 					{
-						i32 value = TileChunk00[Y][X] == 0 ? 0 : 1;
-						SetTile(tile_map, X, Y, value);
+						i32 value = 0;
+						if(TileChunk00[Y][X] > 0)
+						{
+							value = TileChunk00[Y][X] == 1 ? 1 : 2;
+						}
+
+						SetTile(State->WorldArena, tile_map, X, Y, value);
 					}
 			}
 
@@ -251,7 +269,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 			WorldPosition PlayerRight = NewPlayerPos;
 			PlayerRight.TileRelativePos.y += 0.5f * PlayerWidth;
 			PlayerRight = RecanonicalizePosition(world->Tiles, PlayerRight);
-#if 1
+
 			if(IsWorldPointEmpty(world->Tiles, NewPlayerPos) &&
 			   IsWorldPointEmpty(world->Tiles, PlayerLeft) &&
 			   IsWorldPointEmpty(world->Tiles, PlayerRight))
@@ -264,9 +282,6 @@ extern "C" GAME_UPDATE(GameUpdate)
 				v2 Normal = {0.0f, 1.0f};
 				State->PlayerVelocity -= (2 * DotProd(State->PlayerVelocity, Normal) * Normal);
 			}
-#else
-			State->PlayerPos = NewPlayerPos;
-#endif
 		}
 	}
     
@@ -281,6 +296,10 @@ extern "C" GAME_UPDATE(GameUpdate)
 	v2 screen_center = {0.5f * (f32)BackBuffer->BitmapWidth, 0.5f * (f32)BackBuffer->BitmapHeight};
 
 	// Render
+
+	DrawRectangle(BackBuffer, V2(0.0f, 0.0f), V2((f32)BackBuffer->BitmapWidth, (f32)BackBuffer->BitmapHeight),
+			 1.0f, 0.0f, 0.0f);
+
     for(i32 RelRow = -10;
         RelRow < 10;
         ++RelRow)
@@ -291,37 +310,30 @@ extern "C" GAME_UPDATE(GameUpdate)
         {
 			i32 Column = State->PlayerPos.TileX + RelColumn;
 			i32 Row = State->PlayerPos.TileY + RelRow;
-			u32 TileID = GetTile(world->Tiles, Column, Row);
-            f32 Gray = 0.5f;
-
-            if(TileID == 1)
-            {
-                Gray = 1.0f;
-            }
-            
-			#if 1
-			if(Column == State->PlayerPos.TileX && Row == State->PlayerPos.TileY)
+			i32 TileID = GetTile(world->Tiles, Column, Row);
+			if(TileID > 0)
 			{
-				Gray = 0.0f;
+            	f32 Gray = 0.5f;
+				if(TileID == 2)
+            	{
+            	    Gray = 1.0f;
+            	}
+	
+				if(Column == State->PlayerPos.TileX && Row == State->PlayerPos.TileY)
+				{
+					Gray = 0.0f;
+				}
+					
+				v2 tile_center = {screen_center.x - world->Tiles->MetersToPixels*State->PlayerPos.TileRelativePos.x + ((f32)RelColumn)*world->Tiles->TileWidthInPixels,
+								  screen_center.y + world->Tiles->MetersToPixels*State->PlayerPos.TileRelativePos.y - ((f32)RelRow)*world->Tiles->TileWidthInPixels};
+				v2 MinTile = {tile_center.x - 0.5f*tile_map->TileWidthInPixels,
+							  tile_center.y - 0.5f*tile_map->TileWidthInPixels};
+
+				v2 MaxTile = {tile_center.x + 0.5f*tile_map->TileWidthInPixels,
+				 			  tile_center.y + 0.5f*tile_map->TileWidthInPixels};
+
+            	DrawRectangle(BackBuffer, MinTile, MaxTile, Gray, Gray, Gray);			
 			}
-			#endif
-
-			// This is really confusing
-			// I want to see how this can be simplified
-			v2 tile_center = {screen_center.x - world->Tiles->MetersToPixels*State->PlayerPos.TileRelativePos.x + ((f32)RelColumn)*world->Tiles->TileWidthInPixels,
-							  screen_center.y + world->Tiles->MetersToPixels*State->PlayerPos.TileRelativePos.y - ((f32)RelRow)*world->Tiles->TileWidthInPixels};
-			v2 MinTile = {tile_center.x - 0.5f*tile_map->TileWidthInPixels,
-						  tile_center.y - 0.5f*tile_map->TileWidthInPixels};
-
-			v2 MaxTile = {tile_center.x + 0.5f*tile_map->TileWidthInPixels,
-			 			  tile_center.y + 0.5f*tile_map->TileWidthInPixels};
-
-			v2 StartVertex = {MinTile.x,
-			 				  MaxTile.y};
-			v2 EndVertex = {MaxTile.x,
-			 				MinTile.y};
-
-            DrawRectangle(BackBuffer, MinTile, MaxTile, Gray, Gray, Gray);
         }
     }
     
@@ -330,9 +342,11 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 	f32 PlayerTop = screen_center.y - world->Tiles->MetersToPixels*PlayerHeight;
 
+
 	DrawRectangle(BackBuffer,
 				  V2(PlayerLeft, PlayerTop),
 				  V2(PlayerLeft + world->Tiles->MetersToPixels*PlayerHeight,
 				     PlayerTop + world->Tiles->MetersToPixels*PlayerHeight),
                  PlayerR, PlayerG, PlayerB);
+
 }

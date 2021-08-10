@@ -18,13 +18,6 @@ struct TileMap
 	i32 ChunkCountY;
 
 	v2 Origin;
-
-	f32 TileWidth;
-	f32 TileHeight;
-    
-	// Number of tiles in tile map
-	i32 WidthCount;
-	i32 HeightCount;
     
     TileChunk *TileChunks;
 };

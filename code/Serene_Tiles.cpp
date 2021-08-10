@@ -37,7 +37,7 @@ GetChunkPosition(TileMap *tile_map, i32 tile_x, i32 tile_y)
 internal i32
 GetTile(TileMap *tile_map, i32 tile_x, i32 tile_y)
 {
-	i32 Result = -1;
+	i32 Result = 0;
 	ChunkPosition chunk_position = GetChunkPosition(tile_map, tile_x, tile_y);
 	TileChunk *chunk = GetTileChunk(tile_map, chunk_position.ChunkX, chunk_position.ChunkY);
 
@@ -50,15 +50,18 @@ GetTile(TileMap *tile_map, i32 tile_x, i32 tile_y)
 }
 
 internal void
-SetTile(TileMap *tile_map, i32 tile_x, i32 tile_y, i32 value)
+SetTile(MemoryArena world_arena, TileMap *tile_map, i32 tile_x, i32 tile_y, i32 value)
 {
 	ChunkPosition chunk_position = GetChunkPosition(tile_map, tile_x, tile_y);
 	TileChunk *chunk = GetTileChunk(tile_map, chunk_position.ChunkX, chunk_position.ChunkY);
 
-	if(chunk)
+	if(!chunk->Data)
 	{
-		chunk->Data[tile_y * tile_map->ChunkDimm + tile_x] = value;
+		i32 tile_count = tile_map->ChunkDimm * tile_map->ChunkDimm;
+		chunk->Data = PushArray(&world_arena, tile_count, u32);
 	}
+
+	chunk->Data[tile_y * tile_map->ChunkDimm + tile_x] = value;
 }
 
 // Retrieve a tile value
@@ -70,13 +73,13 @@ IsWorldPointEmpty(TileMap *tile_map, WorldPosition position)
 
 	i32 tile_value = GetTile(tile_map, position.TileX, position.TileY);
 
-	Result = (tile_value == 0);
+	Result = (tile_value == 1);
 
 	return Result;
 }
 
 internal void
-RecanonicalizeCoord(TileMap *tile_map, i32 tile_count, i32 *tile_pos, f32 *tile_relative_pos)
+RecanonicalizeCoord(TileMap *tile_map, i32 *tile_pos, f32 *tile_relative_pos)
 {
 	i32 offset = Roundf32Toi32(*tile_relative_pos / tile_map->TileWidthInMeters);
 	*tile_pos += offset;
@@ -92,8 +95,8 @@ RecanonicalizePosition(TileMap *tile_map, WorldPosition position)
 {
 	WorldPosition Result = position;
 
-	RecanonicalizeCoord(tile_map, tile_map->WidthCount, &Result.TileX, &Result.TileRelativePos.x);
-	RecanonicalizeCoord(tile_map, tile_map->HeightCount, &Result.TileY, &Result.TileRelativePos.y);
+	RecanonicalizeCoord(tile_map, &Result.TileX, &Result.TileRelativePos.x);
+	RecanonicalizeCoord(tile_map, &Result.TileY, &Result.TileRelativePos.y);
 
 	return Result;
 }
@@ -106,14 +109,3 @@ InitializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
 	arena->Used = 0;
 }
 
-#define PushStruct(Arena, type) (type *)PushSize_(Arena, sizeof(type))
-#define PushArray(Arena, Count, type) (type *)PushSize_(Arena, (Count)*sizeof(type))
-void *
-PushSize_(MemoryArena *arena, MemoryIndex size)
-{
-    Assert((arena->Used + size) <= arena->Size); // Don't overflow your arena
-    void *Result = arena->Base + arena->Used; // Retrieve a pointer to the latest memory index before adding the memory
-   	arena->Used += size; // add the new size to our index
-    
-    return(Result);
-}
