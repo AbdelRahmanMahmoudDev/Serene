@@ -14,21 +14,10 @@ struct Win32SoundOutput
 	u8* SoundData;
 };
 
-struct Win32BackBuffer
-{
-	void* BitmapMemory;
-	BITMAPINFO BitmapInfo;
-	HBITMAP BitmapHandle;
-	i32 BitmapWidth;
-	i32 BitmapHeight;
-	i32 BytesPerPixel;
-	i32 Pitch;
-};
-
 struct Win32WindowDimensions
 {
-	i32 Width;
-	i32 Height;
+	u32 Width;
+	u32 Height;
 };
 
 #define WIN32_MAX_DIR MAX_PATH
@@ -51,9 +40,17 @@ struct Win32GameCode
 {
 	HMODULE GameLibrary;
 	FILETIME LastWriteTime;
-	game_generate_audio* GameGenerateAudio;
-	game_update*		 GameUpdate;
+	game_generate_audio *GameGenerateAudio;
+	game_update *GameUpdate;
 	b32 IsDLLValid;
+};
+
+struct Win32_OpenGLContext
+{
+	HDC Win32DeviceContext;
+	HGLRC OpenGLDeviceContext;
+	i32 MajorVersion;
+	i32 MinorVersion;
 };
 
 #define SERENE_WIN32_H

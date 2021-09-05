@@ -1,5 +1,13 @@
 #if !defined(SERENE_TILES_H)
 
+struct ChunkPosition
+{
+	i32 ChunkX;
+	i32 ChunkY;
+
+	v2 TileRelativePos;
+};
+
 struct TileChunk
 {
 	u32* Data;

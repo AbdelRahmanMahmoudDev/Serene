@@ -41,7 +41,7 @@ GetTile(TileMap *tile_map, i32 tile_x, i32 tile_y)
 	ChunkPosition chunk_position = GetChunkPosition(tile_map, tile_x, tile_y);
 	TileChunk *chunk = GetTileChunk(tile_map, chunk_position.ChunkX, chunk_position.ChunkY);
 
-	if(chunk)
+	if(chunk && chunk->Data)
 	{
 		Result = chunk->Data[tile_y*tile_map->ChunkDimm + tile_x];
 	}

@@ -1,7 +1,24 @@
 #if !defined(SERENE_CORE_H)
 #include <stdint.h>
 
-//Assertions
+// Compiler detection
+#if !defined(COMPILER_MSVC)
+#define COMPILER_MSVC 0
+#endif
+
+#if !COMPILER_MSVC
+#if defined(_MSC_VER)
+#undef COMPILER_MSVC
+#define COMPILER_MSVC 1
+#endif
+#endif
+
+#if COMPILER_MSVC
+#include <intrin.h>
+#pragma intrinsic(_BitScanForward) 	
+#endif
+
+// Assertions
 #ifdef SAND_DEBUG
 #define Assert(Expression) if(!(Expression)) {*(i8*)0 = 0;}
 #else
@@ -12,13 +29,13 @@
 #define local_persist static //static local variables
 #define global static//static global variables
 
-//Number of elements in an array
+// Number of elements in an array
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
-//math
+// math
 #define Pi 3.14159265359f
 
-//Data types
+// Types
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -36,13 +53,13 @@ typedef int32_t b32;
 
 typedef size_t MemoryIndex;
 
-//Numbers
+// Numbers
 #define KILOBYTES(value) (value*1024LL)
 #define MEGABYTES(value) (KILOBYTES(value)*1024LL)
 #define GIGABYTES(value) (MEGABYTES(value)*1024LL)
 #define TERABYTES(value) (GIGABYTES(value)*1024LL)
 
-//Utilities
+// Utilities
 u32 TruncateU64(u64 value)
 {
 	u64 u64MaxValue = 0xFFFFFFFF;

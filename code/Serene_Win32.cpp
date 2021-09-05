@@ -1,22 +1,25 @@
+
 #include "Serene_Core.h"
+#include "Serene_Platform.h"
 #include "Serene_Game.h"
 
+#include <Windows.h>
 #include <stdio.h>
 #include <wrl.h>
-#include <Windows.h>
 #include <xaudio2.h>
 #include <Xinput.h>
 
+#include "3rd_Party\glad\glad\glad.h"
+#include "3rd_Party\glad\glad\glad.c"
+#include "Serene_OpenGL.h"
+
 #include "Serene_Win32.h"
 
-global Win32BackBuffer GlobalBackBuffer;
-global b32 Win32IsRunning;
+global b32 Win32IsRunning; 
 global u32 Win32KeyCode;
 global b32 Win32WasAltKeyDown;
 global b32 Win32WasKeyDown;
 global b32 Win32IsKeyDown;
-//global HDC MainDeviceContext;
-global HGLRC OpenGLRenderContext;
 global LARGE_INTEGER PerfFrequency;
 
 typedef HGLRC WINAPI wglCreateContextAttribsARBPtr(HDC hdc, HGLRC hShareContext, const int* attribList);
@@ -40,15 +43,14 @@ typedef DWORD xinput_set_state_ptr(DWORD dwUserIndex, XINPUT_VIBRATION *pVibrati
 xinput_set_state_ptr* xinput_set_state;
 #define XInputSetState xinput_set_state
 
-
 // Initialize OpenGL for Windows
-// Windows by default installs OpenGL 1.1, modern OpenGL is available on the dedicated graphics driver and must be loaded on Windows
+// Windows by default installs OpenGL 1.1, modern OpenGL is available on the dedicated graphics driver
+// and must be loaded on Windows
 // This process, as per the documentation is:
 // Create a dummy render context to load the necessary extensions to create a full render context with extensions
 // Set the current context
-#if 0
 internal void
-Win32InitOpenGL(i32 major_version, i32 minor_version)
+Win32InitOpenGL(Win32_OpenGLContext *opengl_context)
 {
 	WNDCLASSEXA DummyWindow = {};
 	DummyWindow.cbSize = sizeof(DummyWindow);
@@ -90,9 +92,13 @@ Win32InitOpenGL(i32 major_version, i32 minor_version)
 		Assert(DummyOpenGLContext != NULL);
 		u32 contextResult = wglMakeCurrent(DummyDC, DummyOpenGLContext);
 		Assert(contextResult == TRUE);
+
+		// This is unnecessary here, since the driver functions are loaded
+		// into the game dll instead
+#if 0
 		u32 gladStatus = gladLoadGL();
-		
 		Assert(gladStatus != 0);
+#endif
 		wglCreateContextAttribsARB = (wglCreateContextAttribsARBPtr*)wglGetProcAddress("wglCreateContextAttribsARB");
 		wglChoosePixelFormatARB = (wglChoosePixelFormatARBPtr*)wglGetProcAddress("wglChoosePixelFormatARB");
 		wglSwapIntervalEXT = (wglSwapIntervalEXTPtr*)wglGetProcAddress("wglSwapIntervalEXT");
@@ -116,24 +122,24 @@ Win32InitOpenGL(i32 major_version, i32 minor_version)
 		
 		i32 pixelFormat = 0;
 		u32 numberOfFormats = 0;
-		wglChoosePixelFormatARB(MainDeviceContext, pixelFormatAttribs, 0, 1, &pixelFormat, &numberOfFormats);
+		wglChoosePixelFormatARB(opengl_context->Win32DeviceContext, pixelFormatAttribs, 0, 1, &pixelFormat, &numberOfFormats);
 		Assert(numberOfFormats != 0);
 		PIXELFORMATDESCRIPTOR DesiredDescriptor = {};
-		DescribePixelFormat(MainDeviceContext, pixelFormat, sizeof(DesiredDescriptor), &DesiredDescriptor);
-		if (!SetPixelFormat(MainDeviceContext, pixelFormat, &DesiredDescriptor))
+		DescribePixelFormat(opengl_context->Win32DeviceContext, pixelFormat, sizeof(DesiredDescriptor), &DesiredDescriptor);
+		if (!SetPixelFormat(opengl_context->Win32DeviceContext, pixelFormat, &DesiredDescriptor))
 		{
 			Assert(false);
 		}
 		i32 openGLVersion[] =
 		{
-			WGL_CONTEXT_MAJOR_VERSION_ARB, major_version,
-			WGL_CONTEXT_MINOR_VERSION_ARB, minor_version,
+			WGL_CONTEXT_MAJOR_VERSION_ARB, opengl_context->MajorVersion,
+			WGL_CONTEXT_MINOR_VERSION_ARB, opengl_context->MinorVersion,
 			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 			0
 		};
-		OpenGLRenderContext = wglCreateContextAttribsARB(MainDeviceContext, 0, openGLVersion);
-		Assert(OpenGLRenderContext != NULL);
-		b32 desiredContextResult = wglMakeCurrent(MainDeviceContext, OpenGLRenderContext);
+		opengl_context->OpenGLDeviceContext = wglCreateContextAttribsARB(opengl_context->Win32DeviceContext, 0, openGLVersion);
+		Assert(opengl_context->OpenGLDeviceContext != NULL);
+		b32 desiredContextResult = wglMakeCurrent(opengl_context->Win32DeviceContext, opengl_context->OpenGLDeviceContext);
 		Assert(desiredContextResult == TRUE);
 	}
 	else
@@ -141,13 +147,13 @@ Win32InitOpenGL(i32 major_version, i32 minor_version)
 		Assert(false);
 	}
 }
-#endif
+
 
 // This function initializes XAudio2. This library requires a number of steps described by the Microsoft documentation
-// 1. Initialize the COM Interface. This API relies heavily on COM and can't be used without it.
-// 2. Load the XAudio2 dll based on the available version. XAudio2 is readily available on all windows installations and doesn't need redistribution
-// 3. Retrieve an XAudio2 interface object
-// 4. Create a mastering voice, which is a representation of the audio hardware
+// 1.Initialize the COM Interface. This API relies heavily on COM and can't be used without it.
+// 2.Load the XAudio2 dll based on the available version. XAudio2 is readily available on all windows installations and doesn't need redistribution
+// 3.Retrieve an XAudio2 interface object
+// 4.Create a mastering voice, which is a representation of the audio hardware
 internal void
 Win32InitXAudio2(Win32SoundOutput *Win32Sound)
 {
@@ -316,6 +322,10 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DebugPlatformReadEntireFile)
 					//ReadFile Failed
 					ThreadContext thread = {};
 					DebugPlatformFreeFileMemory(&thread, Result.Content);
+
+
+
+
 					Result.Content = 0;
 				}
 			}
@@ -582,7 +592,7 @@ Win32ProcessMessages(Win32State *Win32_State, GameController *KeyboardController
 									Win32ProcessKeyboardButton(&KeyboardController->DPadRight, Win32IsKeyDown);
 								}break;
 
-								#ifdef SERENE_INTERNAL
+								#if SERENE_INTERNAL
 								case 'L':
 								{
 									if(Win32IsKeyDown)
@@ -706,60 +716,6 @@ Win32GetWindowDimensions(HWND handle)
 	return Result;
 }
 
-/*
-Create or resize device-independent bitmap
-*/
-internal void
-Win32ResizeDIBSection(Win32BackBuffer *BackBuffer, i32 width, i32 height)
-{
-	if(BackBuffer->BitmapMemory)
-	{
-		VirtualFree(BackBuffer->BitmapMemory, 0, MEM_RELEASE);
-	}
-
-	BackBuffer->BitmapWidth = width;
-	
-	BackBuffer->BitmapHeight = height;
-
-	BackBuffer->BitmapInfo.bmiHeader.biSize = sizeof(BackBuffer->BitmapInfo.bmiHeader);
-	BackBuffer->BitmapInfo.bmiHeader.biWidth = BackBuffer->BitmapWidth;
-	BackBuffer->BitmapInfo.bmiHeader.biHeight = -BackBuffer->BitmapHeight;
-	BackBuffer->BitmapInfo.bmiHeader.biPlanes = 1;
-	BackBuffer->BitmapInfo.bmiHeader.biBitCount = 32;
-	BackBuffer->BitmapInfo.bmiHeader.biCompression = BI_RGB;
-
-
-	i32 BytesPerPixel = 4;
-	BackBuffer->BytesPerPixel = BytesPerPixel;
-	i32 BitmapMemorySize = (BackBuffer->BytesPerPixel *  BackBuffer->BitmapWidth * BackBuffer->BitmapHeight);
-
-	BackBuffer->BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-	BackBuffer->Pitch = width * BackBuffer->BytesPerPixel;
-}
-
-//update device-independent bitmap
-internal void
-Win32UpdateWindow(Win32BackBuffer *BackBuffer, HDC DeviceContext,
-				  i32 WindowWidth, i32 WindowHeight)
-{
-	i32 XOffset = 10;
-	i32 YOffset = 10;
-	PatBlt(DeviceContext, 0, 0, WindowWidth, YOffset, BLACKNESS);
-	PatBlt(DeviceContext, 0, 0, XOffset, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, XOffset + BackBuffer->BitmapWidth, 0, WindowWidth, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, 0, YOffset + BackBuffer->BitmapHeight, WindowWidth, WindowHeight, BLACKNESS);
-
-    StretchDIBits(DeviceContext,
-                  XOffset, YOffset, BackBuffer->BitmapWidth, BackBuffer->BitmapHeight,
-                  0, 0, BackBuffer->BitmapWidth, BackBuffer->BitmapHeight,
-                  BackBuffer->BitmapMemory,
-                  &BackBuffer->BitmapInfo,
-                  DIB_RGB_COLORS, SRCCOPY);
-}
-
-
-
-
 LRESULT CALLBACK
 WindowsCallBack(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 { 
@@ -767,15 +723,6 @@ WindowsCallBack(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	switch (msg)
 	{	
-	case WM_PAINT:
-	{
-		Win32WindowDimensions Dims = Win32GetWindowDimensions(handle);
-        PAINTSTRUCT Paint;
-        HDC DeviceContext = BeginPaint(handle, &Paint);
-        Win32UpdateWindow(&GlobalBackBuffer, DeviceContext, Dims.Width, Dims.Height);
-        EndPaint(handle, &Paint);
-	}break;	
-
 	case WM_ACTIVATEAPP:
 	{
 		#if 0
@@ -842,7 +789,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	WNDCLASSEXA Window = {};
 	Window.hInstance = hInstance;
 	Window.cbSize = sizeof(Window);
-	Window.style = CS_HREDRAW | CS_VREDRAW;
+	Window.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 	Window.lpfnWndProc = WindowsCallBack;
 	Window.cbClsExtra = 0;
 	Window.cbWndExtra = 0;
@@ -852,15 +799,37 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	Window.lpszClassName = "MainWindow";
 	Window.hIconSm = LoadIconA(Window.hInstance, IDI_APPLICATION);
 
-    Win32ResizeDIBSection(&GlobalBackBuffer, 960, 540);
-
 	RegisterClassExA(&Window);
 
-	HWND WindowHandle = CreateWindowExA(0, "MainWindow", "Serene: Platform Test App", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
-		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
+	RECT DrawableRect = {};
+	DrawableRect.right = 1280;
+	DrawableRect.bottom = 720;
+
+	Win32WindowDimensions window_dimensions = {};
+	window_dimensions.Width = DrawableRect.right;
+	window_dimensions.Height = DrawableRect.bottom;
+
+	DWORD window_style = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+	AdjustWindowRect(&DrawableRect, window_style, 0);
+
+	HWND WindowHandle = CreateWindowExA(0, "MainWindow", "Serene: Platform Test App",
+									    window_style,
+		                                CW_USEDEFAULT,
+										CW_USEDEFAULT,
+										DrawableRect.right - DrawableRect.left,
+										DrawableRect.bottom - DrawableRect.top,
+										0, 0, hInstance, 0);
 
 	ShowWindow(WindowHandle, nCmdShow);
 	UpdateWindow(WindowHandle);
+
+	// Init OpenGL
+	Win32_OpenGLContext opengl_render_context = {};
+	opengl_render_context.Win32DeviceContext = GetDC(WindowHandle);
+	opengl_render_context.MajorVersion = 4;
+	opengl_render_context.MinorVersion = 6;
+	Win32InitOpenGL(&opengl_render_context);
+	wglSwapIntervalEXT(0);
 
 	if (WindowHandle)
 	{
@@ -875,7 +844,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		u32 MonitorRefreshRate = 0;
 		if(RetrievedRefreshRate > 1)
 		{
-		MonitorRefreshRate = RetrievedRefreshRate; 
+			MonitorRefreshRate = RetrievedRefreshRate; 
 		}
 		else
 		{
@@ -890,8 +859,10 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		LPVOID BaseAddress = 0;
 		#endif
 
+
 		GameMemory Memory = {};
 		Memory.DebugPlatformFreeFileMemory = DebugPlatformFreeFileMemory;
+
 		Memory.DebugPlatformReadEntireFile = DebugPlatformReadEntireFile;
 		Memory.DebugPlatformWriteEntireFile = DebugPlatformWriteEntireFile;
 		Memory.PermanentStorageSize = MEGABYTES(64);
@@ -903,15 +874,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		Memory.TransientStorage = ((u8*)Memory.PermanentStorage + Memory.PermanentStorageSize);
 		Assert(Memory.PermanentStorage && Memory.TransientStorage);
 
-		//Graphics
-		GameBackBuffer GameRenderBuffer = {};
-		GameRenderBuffer.BitmapMemory = GlobalBackBuffer.BitmapMemory;
-		GameRenderBuffer.BitmapWidth = GlobalBackBuffer.BitmapWidth;
-		GameRenderBuffer.BitmapHeight = GlobalBackBuffer.BitmapHeight;
-		GameRenderBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
-		GameRenderBuffer.Pitch = GlobalBackBuffer.Pitch;
-
-		//Init audio
+		// Allocate audio memory
+		// TODO(abdo): This should be pooled with our other memory
 		Win32Sound.SoundData = (u8*)VirtualAlloc(0, Win32Sound.SoundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 		Assert(Win32Sound.SoundData);
 
@@ -927,16 +891,14 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		Win32SubmitAudio(&Win32Sound);
         Win32Sound.Win32SourceVoice->Start();
 
+		GameRendererDimensons game_renderer_dimensions = {};
+		game_renderer_dimensions.ScreenWidth = window_dimensions.Width;
+		game_renderer_dimensions.ScreenHeight = window_dimensions.Height;
+
 		//Setup Input
 		GameInput Input[2] = {};
 		GameInput* OldInput = &Input[0];
 		GameInput* NewInput = &Input[1];
-
-#if 0
-		//Init graphics
-		Win32InitOpenGL(4, 6);
-		wglSwapIntervalEXT(0);
-#endif
 
 		Win32GameCode GameCode = Win32LoadGameDLL(SourceGameDLLFullPath, TempGameDLLFullPath);
 
@@ -1065,17 +1027,13 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 				Win32PlaybackInput(&Win32_State, NewInput);
 			}
 
-			
 			if(GameCode.GameUpdate && GameCode.GameGenerateAudio)
 			{
-				GameCode.GameUpdate(&Thread, &Memory, &GameRenderBuffer, NewInput, &GameAudio);
+				GameCode.GameUpdate(&Thread, &Memory, &game_renderer_dimensions, NewInput, &GameAudio);
 			}
 
-			Win32WindowDimensions Dims = Win32GetWindowDimensions(WindowHandle);
-			HDC DeviceContext = GetDC(WindowHandle);
-			Win32UpdateWindow(&GlobalBackBuffer, DeviceContext, Dims.Width, Dims.Height);
-			ReleaseDC(WindowHandle, DeviceContext);
-
+			BOOL swap_result = SwapBuffers(opengl_render_context.Win32DeviceContext);
+			DWORD error_code = GetLastError();
 			//Swap input states to always get latest state
 			GameInput* temp = NewInput;
 			NewInput = OldInput;

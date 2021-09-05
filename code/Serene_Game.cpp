@@ -1,7 +1,12 @@
 #include "Serene_Game.h"
+#include "Serene_Platform.h"
 #include "Serene_Intrinsics.h"
 #include "Serene_Math.h"
 
+#include "3rd_Party\glad\glad\glad.h"
+#include "3rd_Party\glad\glad\glad.c"
+#include "Serene_OpenGL.h"
+#include "Serene_OpenGL.cpp"
 
 // The game layer is currently only responsible for filling the sound buffer
 // Sound play and update is managed by the OS
@@ -21,62 +26,6 @@ extern "C" GAME_GENERATE_AUDIO(GameGenerateAudio)
 	}
 }
 
-internal void DrawRectangle(GameBackBuffer* Buffer, v2 MinPos, v2 MaxPos, 
-                            f32 Red, f32 Green, f32 Blue)
-{
-	i32 IntegerMinX = Roundf32Toi32(MinPos.x);
-	i32 IntegerMinY = Roundf32Toi32(MinPos.y);
-	i32 IntegerMaxX = Roundf32Toi32(MaxPos.x);
-	i32 IntegerMaxY = Roundf32Toi32(MaxPos.y);
-	
-	if(IntegerMinX < 0)
-	{
-		IntegerMinX = 0;
-	}
-    
-	if(IntegerMinY < 0)
-	{
-		IntegerMinY = 0;
-	}
-    
-	if(IntegerMaxX > Buffer->BitmapWidth)
-	{
-		IntegerMaxX = Buffer->BitmapWidth;
-	}
-    
-	if(IntegerMaxY > Buffer->BitmapHeight)
-	{
-		IntegerMaxY = Buffer->BitmapHeight;	
-	}
-    
-    // AA RR GG BB
-	// Alpha is 24 bits to the left (not used)
-	// Red is 16 bits to the left
-	// Green is 8 bits to the left
-	// Blue is 0 bits to the left
-	
-    u32 Color = ((Roundf32Tou32(Red * 255.0f) << 16) |
-                 (Roundf32Tou32(Green * 255.0f) << 8) |
-                 (Roundf32Tou32(Blue * 255.0f) << 0));
-    	u8* Row = ((u8*)Buffer->BitmapMemory) +
-    (IntegerMinY * Buffer->Pitch) +
-    (IntegerMinX * Buffer->BytesPerPixel);
-    
-	for(i32 Y = IntegerMinY;
-        Y < IntegerMaxY;
-        ++Y)
-	{
-		u32* Pixel = (u32*)Row;
-		for(i32 X = IntegerMinX;
-            X < IntegerMaxX;
-            ++X)
-		{
-			*Pixel++ = Color;
-		}
-		Row+= Buffer->Pitch;
-	}
-}
-
 #define PushStruct(Arena, type) (type *)PushSize_(Arena, sizeof(type))
 #define PushArray(Arena, Count, type) (type *)PushSize_(Arena, (Count)*sizeof(type))
 void *
@@ -91,20 +40,96 @@ PushSize_(MemoryArena *arena, MemoryIndex size)
 
 #include "Serene_Tiles.cpp"
 
+// struct members pulled from https://www.fileformat.info/format/bmp/egff.htm
+// web page includes information about the file format
+#pragma pack(push, 1)
+struct BMPHeader
+{
+	u16 FileType;        /* File type, always ("BM") */
+	u32 FileSize;        /* Size of the file in bytes */
+	u16 Reserved1;       /* Always 0 */
+	u16 Reserved2;       /* Always 0 */
+	u32 BitmapOffset;    /* Starting position of image data in bytes */
+	u32 Size;            /* Size of this header in bytes */
+	i32 Width;           /* Image width in pixels */
+	i32 Height;          /* Image height in pixels */
+	u16 Planes;          /* Number of color planes */
+	u16 BitsPerPixel;    /* Number of bits per pixel */
+	u32 Compression;     /* Compression methods used */
+	u32 SizeOfBitmap;    /* Size of bitmap in bytes */
+	i32 HorzResolution;  /* Horizontal resolution in pixels per meter */
+	i32 VertResolution;  /* Vertical resolution in pixels per meter */
+	u32 ColorsUsed;      /* Number of colors in the image */
+	u32 ColorsImportant; /* Minimum number of important colors */
+	u32 RedMask;         /* Mask identifying bits of red component */
+	u32 GreenMask;       /* Mask identifying bits of green component */
+	u32 BlueMask;        /* Mask identifying bits of blue component */
+};
+#pragma pack(pop)
+
+
+internal BMPAsset
+DEBUGLoadBMP(char *path, debug_platform_read_entire_file *pReadEntireFile, ThreadContext *thread)
+{
+	BMPAsset Result = {};
+	DebugPlatformReadFileResult read_result = pReadEntireFile(thread, path);
+
+	if(read_result.ContentSize != 0)
+	{
+		BMPHeader *bitmap_header = (BMPHeader *)read_result.Content;
+		u32 *pixels = (u32 *)((u8 *)read_result.Content + bitmap_header->BitmapOffset);
+		Result.Pixels = pixels;
+		Result.Width = bitmap_header->Width;
+		Result.Height = bitmap_header->Height;
+
+		Assert(bitmap_header->Compression == 3);
+
+		u32 red_mask = bitmap_header->RedMask;
+		u32 green_mask = bitmap_header->GreenMask;
+		u32 blue_mask = bitmap_header->BlueMask;
+		u32 alpha_mask = ~(red_mask | green_mask | blue_mask);
+
+		BitScanResult red_shift = FindLeastSignificantSetBit32(red_mask); 
+		BitScanResult green_shift = FindLeastSignificantSetBit32(green_mask); 
+		BitScanResult blue_shift = FindLeastSignificantSetBit32(blue_mask); 
+		BitScanResult alpha_shift = FindLeastSignificantSetBit32(alpha_mask); 
+
+		Assert(red_shift.IsFound);
+		Assert(green_shift.IsFound);
+		Assert(blue_shift.IsFound);
+		Assert(alpha_shift.IsFound);
+
+		u32 *SourceDest = pixels;
+		for(i32 y = 0; y < bitmap_header->Height; ++y)
+		{
+			for(i32 x = 0; x < bitmap_header->Width; ++x)
+			{
+                u32 C = *SourceDest;
+                *SourceDest++ = ((((C >> alpha_shift.Index) & 0xFF) << 24) |
+                                 (((C >> red_shift.Index) & 0xFF) << 16) |
+                                 (((C >> green_shift.Index) & 0xFF) << 8) |
+                                 (((C >> blue_shift.Index) & 0xFF) << 0));
+			}
+		}
+	}
+
+	return Result;
+}
+
+
 extern "C" GAME_UPDATE(GameUpdate)
 {
-	#if 1
 	// 9 rows, 16 columns
-	local_persist u32 TileChunk00[256][256] = 
+	local_persist u32 test_level_layout[256][256] = 
 	{
         {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
-        {2, 2, 1, 1,  1, 2, 1, 1,  1, 1, 1, 1,  1, 2, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 2, 1, 1,  1, 1, 1, 1,  2, 1, 1, 1,  1, 1, 2, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  2, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {1, 1, 1, 1,  1, 2, 1, 1,  2, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
-        {2, 2, 1, 1,  1, 2, 1, 1,  2, 1, 1, 1,  1, 2, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 2, 1, 1,  2, 1, 1, 1,  2, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 2, 2, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 2, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
+        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
         {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
         {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
         {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
@@ -117,38 +142,29 @@ extern "C" GAME_UPDATE(GameUpdate)
         {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
 	};
 
-	#else
-		local_persist u32 TileChunk00[256][256] = 
-	{
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-        {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0},
-	};
-	#endif
 
 	// Memory
 	Assert(sizeof(GameState) <= Memory->PermanentStorageSize);
 	GameState* State = (GameState*)Memory->PermanentStorage;
 	if(!Memory->IsInitialized)
 	{
+		// We need to load all driver functions into the game dll
+		// IMPORTANT(Abdo): This only applies to the OpenGL Renderer
+		// TODO(Abdo): Do this somewhere more sensible!!
+		i32 glad_status = gladLoadGL();
+		glViewport(0, 0, 1280, 720);
 		// Placeholder thread thing
 		ThreadContext thread = {};
         
+		// Loading game assets
+#if 0
+		State->BackDrop = DEBUGLoadBMP("assets/test_background.bmp", Memory->DebugPlatformReadEntireFile, &thread);
+		State->Player = DEBUGLoadBMP("Character1/dude.bmp", Memory->DebugPlatformReadEntireFile, &thread);
+#else
+        State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile,
+						                          "shaders/BasicFill.vert", "shaders/BasicFill.frag",
+						                          &thread);
+#endif
 		// Setting up memory arenas
 		InitializeArena(&State->WorldArena,
 					 	Memory->PermanentStorageSize - sizeof(GameState),
@@ -176,7 +192,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 		// But the y origin must be moved from the top left to the bottom left
 		// the bottom left is the top left offset by the bitmap height
 		// This is because the OS creates a buffer that starts at the top left 
-		tile_map->Origin = {0.0f, (f32)BackBuffer->BitmapHeight};
+		tile_map->Origin = {0.0f, 0.0f};
 
 		// State
 		State->PlayerPos.TileX = 3;
@@ -193,9 +209,9 @@ extern "C" GAME_UPDATE(GameUpdate)
 					++X)
 					{
 						i32 value = 0;
-						if(TileChunk00[Y][X] > 0)
+						if(test_level_layout[Y][X] > 0)
 						{
-							value = TileChunk00[Y][X] == 1 ? 1 : 2;
+							value = test_level_layout[Y][X] == 1 ? 1 : 2;
 						}
 
 						SetTile(State->WorldArena, tile_map, X, Y, value);
@@ -293,60 +309,112 @@ extern "C" GAME_UPDATE(GameUpdate)
 		SoundOutput->IsBufferFilled = true;
 	}
 
-	v2 screen_center = {0.5f * (f32)BackBuffer->BitmapWidth, 0.5f * (f32)BackBuffer->BitmapHeight};
+	// Render 
+	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
-	// Render
+	f32 tile_dimms = 60.0f;
+	i32 column_count = CeilFloat((f32)renderer_dimensions->ScreenWidth / tile_dimms);
+	i32 row_count = CeilFloat((f32)renderer_dimensions->ScreenHeight / tile_dimms);
 
-	DrawRectangle(BackBuffer, V2(0.0f, 0.0f), V2((f32)BackBuffer->BitmapWidth, (f32)BackBuffer->BitmapHeight),
-			 1.0f, 0.0f, 0.0f);
+	v2 origin = {0.0f, 0.0f};
 
-    for(i32 RelRow = -10;
-        RelRow < 10;
-        ++RelRow)
-    {
-        for(i32 RelColumn = -20;
-            RelColumn < 20;
-            ++RelColumn)
-        {
-			i32 Column = State->PlayerPos.TileX + RelColumn;
-			i32 Row = State->PlayerPos.TileY + RelRow;
-			i32 TileID = GetTile(world->Tiles, Column, Row);
-			if(TileID > 0)
-			{
-            	f32 Gray = 0.5f;
-				if(TileID == 2)
-            	{
-            	    Gray = 1.0f;
-            	}
-	
-				if(Column == State->PlayerPos.TileX && Row == State->PlayerPos.TileY)
+	Quadrilateral tile = {};
+
+	i32 indices[] = {0, 1, 2, 2, 3, 0};
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	f32 offset = 3.0f;
+	for(i32 row_index = 0;
+	    row_index <= row_count;
+		++row_index)
+		{
+			for(i32 column_index = 0;
+				column_index <= column_count;
+				++column_index)
 				{
-					Gray = 0.0f;
+#if 1					
+					tile.Position[0] = OpenGLNormalizePosition({(column_index*tile_dimms)+origin.x,
+					 											(row_index*tile_dimms)+origin.y, 0.0f},
+					                                           renderer_dimensions->ScreenWidth,
+															   renderer_dimensions->ScreenHeight);
+
+					tile.Position[1] = OpenGLNormalizePosition({(column_index*tile_dimms)+(origin.x+tile_dimms),
+																(row_index*tile_dimms)+origin.y, 0.0f},
+					                                           renderer_dimensions->ScreenWidth,
+															   renderer_dimensions->ScreenHeight);
+
+					tile.Position[2] = OpenGLNormalizePosition({(column_index*tile_dimms)+(origin.x+tile_dimms),
+																(row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f},
+					                                           renderer_dimensions->ScreenWidth,
+															   renderer_dimensions->ScreenHeight);
+
+					tile.Position[3] = OpenGLNormalizePosition({(column_index*tile_dimms)+origin.x,
+					                                            (row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f},
+					                                           renderer_dimensions->ScreenWidth,
+															   renderer_dimensions->ScreenHeight);
+#else
+					tile.Position[0] = {(column_index*tile_dimms)+origin.x,
+					 					(row_index*tile_dimms)+origin.y, 0.0f};
+
+					tile.Position[1] = {(column_index*tile_dimms)+(origin.x+tile_dimms),
+										(row_index*tile_dimms)+origin.y, 0.0f};
+
+					tile.Position[2] = {(column_index*tile_dimms)+(origin.x+tile_dimms),
+										(row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f};
+
+					tile.Position[3] = {(column_index*tile_dimms)+origin.x,
+					                    (row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f};
+#endif
+#if 0
+					tile.Color[0] = {1.0f, 0.0f, 0.0f};															   														   															   
+					tile.Color[1] = {1.0f, 0.0f, 0.0f};															   														   															   
+					tile.Color[2] = {1.0f, 0.0f, 0.0f};															   														   															   
+					tile.Color[3] = {1.0f, 0.0f, 0.0f};
+#else
+					if(((column_index % 2) == 0) && ((row_index % 2) == 0))
+					{
+						tile.Color[0] = {1.0f, 0.0f, 0.0f};															   														   															   
+						tile.Color[1] = {1.0f, 0.0f, 0.0f};															   														   															   
+						tile.Color[2] = {1.0f, 0.0f, 0.0f};															   														   															   
+						tile.Color[3] = {1.0f, 0.0f, 0.0f};
+					}
+					else
+					{
+						tile.Color[0] = {0.0f, 0.0f, 1.0f};															   														   															   
+						tile.Color[1] = {0.0f, 0.0f, 1.0f};															   														   															   
+						tile.Color[2] = {0.0f, 0.0f, 1.0f};															   														   															   
+						tile.Color[3] = {0.0f, 0.0f, 1.0f};
+					}
+#endif
+					u32 vertex_array_object = 0;
+					glGenVertexArrays(1, &vertex_array_object);
+					glBindVertexArray(vertex_array_object);
+
+					u32 vertex_buffer_object = 0;
+					glGenBuffers(1, &vertex_buffer_object);
+					glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
+					glBufferData(GL_ARRAY_BUFFER, sizeof(Quadrilateral), &tile, GL_STATIC_DRAW);
+					glEnableVertexAttribArray(0);
+					glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+					                      offsetof(Quadrilateral, Position) / sizeof(f32),
+										  (void *)(offsetof(Quadrilateral, Position)));
+					glEnableVertexAttribArray(1);
+					glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+					                      offsetof(Quadrilateral, Color) / sizeof(f32),
+										  (void *)(offsetof(Quadrilateral, Color)));										  
+
+					u32 element_buffer_object = 0;
+					glGenBuffers(1, &element_buffer_object);
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_object);
+					glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+					glUseProgram(State->shader_program);
+
+					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 				}
-					
-				v2 tile_center = {screen_center.x - world->Tiles->MetersToPixels*State->PlayerPos.TileRelativePos.x + ((f32)RelColumn)*world->Tiles->TileWidthInPixels,
-								  screen_center.y + world->Tiles->MetersToPixels*State->PlayerPos.TileRelativePos.y - ((f32)RelRow)*world->Tiles->TileWidthInPixels};
-				v2 MinTile = {tile_center.x - 0.5f*tile_map->TileWidthInPixels,
-							  tile_center.y - 0.5f*tile_map->TileWidthInPixels};
-
-				v2 MaxTile = {tile_center.x + 0.5f*tile_map->TileWidthInPixels,
-				 			  tile_center.y + 0.5f*tile_map->TileWidthInPixels};
-
-            	DrawRectangle(BackBuffer, MinTile, MaxTile, Gray, Gray, Gray);			
-			}
-        }
-    }
-    
-
-	f32 PlayerLeft = screen_center.x - 0.5f*world->Tiles->MetersToPixels*PlayerWidth;
-
-	f32 PlayerTop = screen_center.y - world->Tiles->MetersToPixels*PlayerHeight;
-
-
-	DrawRectangle(BackBuffer,
-				  V2(PlayerLeft, PlayerTop),
-				  V2(PlayerLeft + world->Tiles->MetersToPixels*PlayerHeight,
-				     PlayerTop + world->Tiles->MetersToPixels*PlayerHeight),
-                 PlayerR, PlayerG, PlayerB);
+		}
 
 }
