@@ -2,9 +2,12 @@
 
 #include "Serene_Platform.h"
 
+#include "3rd_Party/Handmade-Math/HandmadeMath.h"
+
 // This normalizes a position based on a screen width and height
 // to the [-1, 1] mapping OpenGL wants
 // ignore z axis for now
+#if 0
 internal v3 
 OpenGLNormalizePosition(v3 value, u32 screen_width, u32 screen_height)
 {
@@ -74,6 +77,7 @@ OpenGLNormalizePosition(v3 value, u32 screen_width, u32 screen_height)
     }
     return(Result);
 }
+#endif
 
 internal u32 
 OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path, char *fragment_path, ThreadContext *thread)
@@ -219,4 +223,11 @@ SetInt(u32 shader_handle, char *uniform_name, i32 value)
 {
     i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
     glUniform1i(uniform_location, value);
+}
+
+internal void
+SetMat4(u32 shader_handle, char *uniform_name, hmm_m4 matrix)
+{
+    i32 unifrom_location = glGetUniformLocation(shader_handle, uniform_name);
+    glUniformMatrix4fv(unifrom_location, 1, GL_FALSE, (f32 *)matrix.Elements);
 }

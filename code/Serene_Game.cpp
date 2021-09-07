@@ -1,10 +1,10 @@
 #include "Serene_Game.h"
 #include "Serene_Platform.h"
 #include "Serene_Intrinsics.h"
-#include "Serene_Math.h"
 
-#include "3rd_Party\glad\glad\glad.h"
-#include "3rd_Party\glad\glad\glad.c"
+#include "3rd_Party/Handmade-Math/HandmadeMath.h"
+#include "3rd_Party/glad/glad/glad.h"
+#include "3rd_Party/glad/glad/glad.c"
 #include "Serene_OpenGL.h"
 #include "Serene_OpenGL.cpp"
 
@@ -152,18 +152,31 @@ extern "C" GAME_UPDATE(GameUpdate)
 		// IMPORTANT(Abdo): This only applies to the OpenGL Renderer
 		// TODO(Abdo): Do this somewhere more sensible!!
 		i32 glad_status = gladLoadGL();
-		glViewport(0, 0, 1280, 720);
+		glViewport(0, 0, renderer_dimensions->ScreenWidth, renderer_dimensions->ScreenHeight);
 		// Placeholder thread thing
 		ThreadContext thread = {};
         
 		// Loading game assets
+		// Right now, this depends on setting the working directory in Visual Studio
+		// TODO(Abdo): Construct an asset path during runtime
 #if 0
 		State->BackDrop = DEBUGLoadBMP("assets/test_background.bmp", Memory->DebugPlatformReadEntireFile, &thread);
 		State->Player = DEBUGLoadBMP("Character1/dude.bmp", Memory->DebugPlatformReadEntireFile, &thread);
 #else
-        State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile,
-						                          "shaders/BasicFill.vert", "shaders/BasicFill.frag",
-						                          &thread);
+		#define MAX_PATH 260
+		char *VertPath = "/Shaders/BasicFill.vert";
+		char full_vert[MAX_PATH];
+		strcpy(full_vert, asset_path->AssetPath);
+		strcat(full_vert, VertPath);
+
+		char *FragPath = "/Shaders/BasicFill.frag";
+		char full_frag[MAX_PATH];
+		strcpy(full_frag, asset_path->AssetPath);
+		strcat(full_frag, FragPath);
+
+
+
+        State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, full_vert, full_frag, &thread);
 #endif
 		// Setting up memory arenas
 		InitializeArena(&State->WorldArena,
@@ -197,8 +210,8 @@ extern "C" GAME_UPDATE(GameUpdate)
 		// State
 		State->PlayerPos.TileX = 3;
 		State->PlayerPos.TileY = 3;
-		State->PlayerPos.TileRelativePos.x = 5.0f;
-		State->PlayerPos.TileRelativePos.y = 5.0f;
+		State->PlayerPos.TileRelativePos.X = 5.0f;
+		State->PlayerPos.TileRelativePos.Y = 5.0f;
 
 		for (i32 Y = 0;
 			Y < 256;
@@ -242,62 +255,29 @@ extern "C" GAME_UPDATE(GameUpdate)
 		else
 		{
 			//Digital processing
-            v2 PlayerAcceleration = {};
+            hmm_v2 PlayerAcceleration = {};
 			if(Controller0->DPadUp.EndedPress)
 			{
-				PlayerAcceleration.y = 1.0f;
+				PlayerAcceleration.Y = 1.0f;
 			}
             
 			if(Controller0->DPadDown.EndedPress)
 			{
-				PlayerAcceleration.y = -1.0f;
+				PlayerAcceleration.Y = -1.0f;
 			}
             
 			if(Controller0->DPadLeft.EndedPress)
 			{
-				PlayerAcceleration.x = -1.0f;
+				PlayerAcceleration.X = -1.0f;
 			}
             
 			if(Controller0->DPadRight.EndedPress)
 			{
-				PlayerAcceleration.x = 1.0f;
+				PlayerAcceleration.X = 1.0f;
 			}
 			PlayerAcceleration *= 4.0f;
-
 			// Poor man's friction
 			PlayerAcceleration += -0.9f * State->PlayerVelocity;
-			
-
-			WorldPosition NewPlayerPos = State->PlayerPos;
-			NewPlayerPos.TileRelativePos = (
-											 (0.5f * PlayerAcceleration * Square(Input->TargetSecondsPerFrame)) +
-											 (State->PlayerVelocity * Input->TargetSecondsPerFrame) + 
-											 NewPlayerPos.TileRelativePos
-										   );
-
-			State->PlayerVelocity = PlayerAcceleration * Input->TargetSecondsPerFrame + State->PlayerVelocity;
-			NewPlayerPos = RecanonicalizePosition(world->Tiles, NewPlayerPos);
-            
-			WorldPosition PlayerLeft = NewPlayerPos;
-			PlayerLeft.TileRelativePos.x -= 0.5f * PlayerWidth;
-			PlayerLeft = RecanonicalizePosition(world->Tiles, PlayerLeft);
-
-			WorldPosition PlayerRight = NewPlayerPos;
-			PlayerRight.TileRelativePos.y += 0.5f * PlayerWidth;
-			PlayerRight = RecanonicalizePosition(world->Tiles, PlayerRight);
-
-			if(IsWorldPointEmpty(world->Tiles, NewPlayerPos) &&
-			   IsWorldPointEmpty(world->Tiles, PlayerLeft) &&
-			   IsWorldPointEmpty(world->Tiles, PlayerRight))
-			{
-				State->PlayerPos = NewPlayerPos;
-			}
-			else
-			{
-				// Collision logic
-				v2 Normal = {0.0f, 1.0f};
-				State->PlayerVelocity -= (2 * DotProd(State->PlayerVelocity, Normal) * Normal);
-			}
 		}
 	}
     
@@ -317,13 +297,25 @@ extern "C" GAME_UPDATE(GameUpdate)
 	i32 column_count = CeilFloat((f32)renderer_dimensions->ScreenWidth / tile_dimms);
 	i32 row_count = CeilFloat((f32)renderer_dimensions->ScreenHeight / tile_dimms);
 
-	v2 origin = {0.0f, 0.0f};
+	hmm_v2 origin = {0.0f, 0.0f};
 
 	Quadrilateral tile = {};
+	tile.Position[0] = {-0.5f, -0.5f, 0.0f}; // bottom left
+	tile.Position[1] = {0.5f, -0.5f, 0.0f}; // bottom right
+	tile.Position[2] = {0.5f, 0.5f, 0.0f}; // top right
+	tile.Position[3] = {-0.5f, 0.5f, 0.0f}; // top left
 
 	i32 indices[] = {0, 1, 2, 2, 3, 0};
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	hmm_mat4 model = HMM_Transpose(HMM_Translate({0.0f, 0.0f, 0.0f}) *
+					 HMM_Scale({60.0f / (f32)renderer_dimensions->ScreenWidth, 60.0f / (f32)renderer_dimensions->ScreenHeight, 1.0f}));
+	hmm_mat4 view = HMM_Transpose(HMM_Translate({0.0f, 0.0f, -3.0f}));
+	//hmm_mat4 projection = HMM_Transpose(HMM_Orthographic(0.0f, (f32)renderer_dimensions->ScreenWidth, (f32)renderer_dimensions->ScreenHeight, 0.0f, 0.1f, 100.0f));
+	hmm_mat4 projection = HMM_Mat4d(1.0f);
+	hmm_mat4 model_view_projection = projection * view * model;
+
 
 	f32 offset = 3.0f;
 	for(i32 row_index = 0;
@@ -334,7 +326,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 				column_index <= column_count;
 				++column_index)
 				{
-#if 1					
+#if 0					
 					tile.Position[0] = OpenGLNormalizePosition({(column_index*tile_dimms)+origin.x,
 					 											(row_index*tile_dimms)+origin.y, 0.0f},
 					                                           renderer_dimensions->ScreenWidth,
@@ -354,7 +346,6 @@ extern "C" GAME_UPDATE(GameUpdate)
 					                                            (row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f},
 					                                           renderer_dimensions->ScreenWidth,
 															   renderer_dimensions->ScreenHeight);
-#else
 					tile.Position[0] = {(column_index*tile_dimms)+origin.x,
 					 					(row_index*tile_dimms)+origin.y, 0.0f};
 
@@ -366,13 +357,16 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 					tile.Position[3] = {(column_index*tile_dimms)+origin.x,
 					                    (row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f};
-#endif
-#if 0
-					tile.Color[0] = {1.0f, 0.0f, 0.0f};															   														   															   
-					tile.Color[1] = {1.0f, 0.0f, 0.0f};															   														   															   
-					tile.Color[2] = {1.0f, 0.0f, 0.0f};															   														   															   
-					tile.Color[3] = {1.0f, 0.0f, 0.0f};
 #else
+#if 1
+				model = HMM_Transpose(HMM_Translate({ row_index * tile_dimms, column_index * tile_dimms, 0.0f }));
+#else
+				model = HMM_Mat4d(1.0f);  
+#endif
+
+					model_view_projection = projection * view * model;
+#endif
+
 					if(((column_index % 2) == 0) && ((row_index % 2) == 0))
 					{
 						tile.Color[0] = {1.0f, 0.0f, 0.0f};															   														   															   
@@ -387,7 +381,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 						tile.Color[2] = {0.0f, 0.0f, 1.0f};															   														   															   
 						tile.Color[3] = {0.0f, 0.0f, 1.0f};
 					}
-#endif
+
 					u32 vertex_array_object = 0;
 					glGenVertexArrays(1, &vertex_array_object);
 					glBindVertexArray(vertex_array_object);
@@ -411,6 +405,10 @@ extern "C" GAME_UPDATE(GameUpdate)
 					glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 					glUseProgram(State->shader_program);
+
+					SetMat4(State->shader_program, "u_Projection", projection);
+					SetMat4(State->shader_program, "u_View", view);
+					SetMat4(State->shader_program, "u_Model", model);
 
 					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 

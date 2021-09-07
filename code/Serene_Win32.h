@@ -32,7 +32,7 @@ struct Win32State
     HANDLE PlaybackHandle;
     i32 InputPlayingIndex;    
 
-	char EXEFileName[WIN32_MAX_DIR];
+	char EXEFilePath[WIN32_MAX_DIR];
 	char* OnePastLastSlash;
 };
 

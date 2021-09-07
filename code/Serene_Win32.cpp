@@ -376,43 +376,11 @@ DEBUG_PLATFORM_WRITE_ENTIRE_FILE(DebugPlatformWriteEntireFile)
 	return Result;
 }
 
-//quick and dirt concatenate strings
-internal void
-CatStrings(size_t SourceACount, char *SourceA,
-		   size_t SourceBCount, char *SourceB,
-		   size_t DestinationCount, char *Destination)
-{
-	for(i32 index = 0; index < SourceACount; ++index)
-	{
-		*Destination++ = *SourceA++;
-	}
-
-	for(i32 index = 0; index < SourceBCount; ++index)
-	{
-		*Destination++ = *SourceB++;
-	}
-
-	//Add null termination
-	*Destination++ = 0;
-}
-
-internal i32
-StringLength(char *String)
-{
-	i32 result = 0;
-	while(*String++)
-	{
-		result++;
-	}
-
-	return result;
-}
-
 //Builds a string of the executable path + FileName
 internal void
 Win32BuildEXEPath(Win32State *Win32_State, char *FileName, char *DestinationFilePath)
 {
-	CatStrings(Win32_State->OnePastLastSlash - Win32_State->EXEFileName, Win32_State->EXEFileName,
+	CatStrings(Win32_State->OnePastLastSlash - Win32_State->EXEFilePath, Win32_State->EXEFilePath,
 			   StringLength(FileName), FileName,
 			   StringLength(DestinationFilePath), DestinationFilePath);
 }
@@ -765,8 +733,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	b32 IsSleepGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
 
 	Win32State Win32_State = {};
-	GetModuleFileNameA(NULL, Win32_State.EXEFileName, sizeof(Win32_State.EXEFileName));
-	for(char* Scan = Win32_State.EXEFileName; *Scan; ++Scan)
+	GetModuleFileNameA(NULL, Win32_State.EXEFilePath, sizeof(Win32_State.EXEFilePath));
+	for(char* Scan = Win32_State.EXEFilePath; *Scan; ++Scan)
 	{
 		if(*Scan == '\\')
 		{
@@ -779,6 +747,12 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 
 	char TempGameDLLFullPath[WIN32_MAX_DIR];
 	Win32BuildEXEPath(&Win32_State, "Serene_Game_temp.dll", TempGameDLLFullPath);
+
+	char AssetPath[WIN32_MAX_DIR];
+	Win32BuildEXEPath(&Win32_State, "..\\data", AssetPath);
+
+	GameAssetPath asset_path = {};
+	asset_path.AssetPath = AssetPath;
 
 	Win32InitXInput();
     
@@ -1029,7 +1003,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 
 			if(GameCode.GameUpdate && GameCode.GameGenerateAudio)
 			{
-				GameCode.GameUpdate(&Thread, &Memory, &game_renderer_dimensions, NewInput, &GameAudio);
+				GameCode.GameUpdate(&Thread, &Memory, &game_renderer_dimensions, NewInput, &GameAudio, &asset_path);
 			}
 
 			BOOL swap_result = SwapBuffers(opengl_render_context.Win32DeviceContext);

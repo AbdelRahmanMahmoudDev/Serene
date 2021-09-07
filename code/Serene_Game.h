@@ -1,7 +1,7 @@
 #if !defined(SERENE_GAME_H)
 
 #include "Serene_Core.h"
-#include "Serene_Math.h"
+#include "3rd_Party/Handmade-Math/HandmadeMath.h"
 #include "Serene_Tiles.h"
 
 struct MemoryArena
@@ -28,14 +28,14 @@ struct WorldPosition
 	i32 TileX;
 	i32 TileY;
 
-	v2 TileRelativePos;
+	hmm_v2 TileRelativePos;
 };
 
 
 struct GameState
 {
 	WorldPosition PlayerPos;
-	v2 PlayerVelocity;
+	hmm_v2 PlayerVelocity;
 	World *world;
 	MemoryArena WorldArena;
 

@@ -1,7 +1,7 @@
 #if !defined(SERENE_MATH_H)
 
 // 2 component vector 
-// STUDY(abdo): See if this union can be of use later on
+// This union gives array access which is important for SIMD
 #if 0
 union v2
 {
@@ -211,16 +211,16 @@ operator*=(v3 &A, f32 scalar)
 }
 
 internal f32
-Square(f32 value)
+DotProd(v2 A, v2 B)
 {
-    f32 Result = value * value;
+    f32 Result = (A.x*B.x) + (A.y*B.y);
     return Result;
 }
 
 internal f32
-DotProd(v2 A, v2 B)
+Square(f32 value)
 {
-    f32 Result = (A.x*B.x) + (A.y*B.y);
+    f32 Result = value * value;
     return Result;
 }
 

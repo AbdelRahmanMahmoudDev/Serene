@@ -1,6 +1,8 @@
 // This file will contain all structures passed from the OS to the game
 #if !defined(SERENE_PLATFORM_H)
 
+#include <stdio.h>
+
 struct GameSoundOutput
 {
 	u64 SoundBufferSize;
@@ -110,6 +112,11 @@ struct GameRendererDimensons
     u32 ScreenHeight;
 };
 
+struct GameAssetPath
+{
+	char *AssetPath;
+};
+
 /*
 Permanent Storage is data that persists between frames
 Transient Storage is data that doesn't necessarily live in memory between frames (disk i/o)
@@ -137,8 +144,46 @@ struct GameMemory
 #define GAME_GENERATE_AUDIO(name) void name(ThreadContext* Thread, GameSoundOutput* SoundOutput)
 typedef GAME_GENERATE_AUDIO(game_generate_audio);
 
-#define GAME_UPDATE(name) void name(ThreadContext* Thread, GameMemory* Memory, GameRendererDimensons *renderer_dimensions, GameInput* Input, GameSoundOutput* SoundOutput)
+#define GAME_UPDATE(name) void name(ThreadContext* Thread, GameMemory* Memory, GameRendererDimensons *renderer_dimensions, GameInput* Input, GameSoundOutput* SoundOutput, GameAssetPath *asset_path)
 typedef GAME_UPDATE(game_update);
+
+// Note(abdo): These functions were taken from HandmadeHero for educational purposes only
+// they're currently being used in Serene_Win32.cpp 
+// Important(abdo): Use c string functions instead of these
+
+// quick and dirt concatenate strings
+internal void
+CatStrings(i64 SourceACount, char *SourceA,
+		   i64 SourceBCount, char *SourceB,
+		   i64 DestinationCount, char *Destination)
+{
+	for(i32 index = 0; index < SourceACount; ++index)
+	{
+		*Destination++ = *SourceA++;
+	}
+
+	for(i32 index = 0; index < SourceBCount; ++index)
+	{
+		*Destination++ = *SourceB++;
+	}
+
+	//Add null termination
+	*Destination++ = 0;
+}
+
+
+internal i32
+StringLength(char *String)
+{
+	i32 result = 0;
+	while(*String++)
+	{
+		result++;
+	}
+
+	return result;
+}
+
 
 #define SERENE_PLATFORM_H
 #endif

@@ -25,8 +25,8 @@ GetChunkPosition(TileMap *tile_map, i32 tile_x, i32 tile_y)
 
 	Result.ChunkX = tile_x >> tile_map->ChunkShift;
 	Result.ChunkY = tile_y >> tile_map->ChunkShift;
-	Result.TileRelativePos.x = (f32)(tile_x & tile_map->ChunkMask);
-	Result.TileRelativePos.y = (f32)(tile_y & tile_map->ChunkMask);
+	Result.TileRelativePos.X = (f32)(tile_x & tile_map->ChunkMask);
+	Result.TileRelativePos.Y = (f32)(tile_y & tile_map->ChunkMask);
 
 	return Result;
 }
@@ -95,8 +95,8 @@ RecanonicalizePosition(TileMap *tile_map, WorldPosition position)
 {
 	WorldPosition Result = position;
 
-	RecanonicalizeCoord(tile_map, &Result.TileX, &Result.TileRelativePos.x);
-	RecanonicalizeCoord(tile_map, &Result.TileY, &Result.TileRelativePos.y);
+	RecanonicalizeCoord(tile_map, &Result.TileX, &Result.TileRelativePos.X);
+	RecanonicalizeCoord(tile_map, &Result.TileY, &Result.TileRelativePos.Y);
 
 	return Result;
 }

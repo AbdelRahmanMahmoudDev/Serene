@@ -1,7 +1,9 @@
 #if !defined(SERENE_OPENGL_H)
 #define SERENE_OPENGL_H
 
-#include "Serene_Math.h"
+// #include "Serene_Math.h"
+#include "3rd_Party/Handmade-math/HandmadeMath.h"
+
 
 // Sourced from various places on the internet
 #define WGL_CONTEXT_MAJOR_VERSION_ARB           0x2091
@@ -54,8 +56,8 @@
 
 struct Quadrilateral
 {
-    v3 Position[4];
-    v3 Color[4];
+    hmm_v3 Position[4];
+    hmm_v3 Color[4];
 };
 
 #endif

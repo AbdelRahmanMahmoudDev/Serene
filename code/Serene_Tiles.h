@@ -5,7 +5,7 @@ struct ChunkPosition
 	i32 ChunkX;
 	i32 ChunkY;
 
-	v2 TileRelativePos;
+	hmm_v2 TileRelativePos;
 };
 
 struct TileChunk
@@ -25,7 +25,7 @@ struct TileMap
 	i32 ChunkCountX;
 	i32 ChunkCountY;
 
-	v2 Origin;
+	hmm_v2 Origin;
     
     TileChunk *TileChunks;
 };

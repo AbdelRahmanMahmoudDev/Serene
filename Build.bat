@@ -1,6 +1,6 @@
 @echo off
 
-set CommonCompilerFlags=-DSERENE_DEBUG=1 -DSERENE_INTERNAL=1 -DSERENE_WIN32=1 -Gm- -MTd -nologo -EHa- -GR- -Od -Oi -WX -W4 -wd4505 -wd4201 -wd4100 -wd4101 -wd4189 -FC -Z7 
+set CommonCompilerFlags=-DSERENE_DEBUG=1 -DSERENE_INTERNAL=1 -DSERENE_WIN32=1 -D_CRT_SECURE_NO_WARNINGS=1 -Gm- -MTd -nologo -EHa- -GR- -Od -Oi -WX -W4 -wd4505 -wd4201 -wd4100 -wd4101 -wd4189 -FC -Z7 
 set CommonLinkerFlags= -incremental:no -opt:ref user32.lib Gdi32.lib Winmm.lib Opengl32.lib
 
 IF NOT EXIST build mkdir build
