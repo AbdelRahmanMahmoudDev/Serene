@@ -219,6 +219,13 @@ SetFloat(u32 shader_handle, char *uniform_name, f32 value)
 }
 
 internal void
+SetVec2(u32 shader_handle, char *uniform_name, hmm_v2 value) 
+{
+    i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
+    glUniform2f(uniform_location, value.X, value.Y);
+}
+
+internal void
 SetInt(u32 shader_handle, char *uniform_name, i32 value)
 {
     i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);

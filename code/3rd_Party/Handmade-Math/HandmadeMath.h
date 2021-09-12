@@ -1518,6 +1518,8 @@ HMM_INLINE hmm_mat4 HMM_PREFIX(Orthographic)(float Left, float Right, float Bott
 
     hmm_mat4 Result = HMM_PREFIX(Mat4)();
 
+#if 1
+    // left handed coordinate system 
     Result.Elements[0][0] = 2.0f / (Right - Left);
     Result.Elements[1][1] = 2.0f / (Top - Bottom);
     Result.Elements[2][2] = 2.0f / (Near - Far);
@@ -1526,7 +1528,17 @@ HMM_INLINE hmm_mat4 HMM_PREFIX(Orthographic)(float Left, float Right, float Bott
     Result.Elements[3][0] = (Left + Right) / (Left - Right);
     Result.Elements[3][1] = (Bottom + Top) / (Bottom - Top);
     Result.Elements[3][2] = (Far + Near) / (Near - Far);
+#else
+    // right handed coordinate system 
+    Result.Elements[0][0] = 2.0f / (Right - Left);
+    Result.Elements[1][1] = 2.0f / (Top - Bottom);
+    Result.Elements[2][2] = 2.0f / (Far - Near);
+    Result.Elements[3][3] = 1.0f;
 
+    Result.Elements[3][0] = (Right + Left) / (Right - Left);
+    Result.Elements[3][1] = (Top + Bottom) / (Top - Bottom);
+    Result.Elements[3][2] = (Far + Near) / (Far - Near);
+#endif
     return (Result);
 }
 

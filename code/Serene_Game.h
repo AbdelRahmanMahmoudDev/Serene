@@ -3,6 +3,7 @@
 #include "Serene_Core.h"
 #include "3rd_Party/Handmade-Math/HandmadeMath.h"
 #include "Serene_Tiles.h"
+#include "Serene_OpenGL.h"
 
 struct MemoryArena
 {

@@ -157,8 +157,6 @@ extern "C" GAME_UPDATE(GameUpdate)
 		ThreadContext thread = {};
         
 		// Loading game assets
-		// Right now, this depends on setting the working directory in Visual Studio
-		// TODO(Abdo): Construct an asset path during runtime
 #if 0
 		State->BackDrop = DEBUGLoadBMP("assets/test_background.bmp", Memory->DebugPlatformReadEntireFile, &thread);
 		State->Player = DEBUGLoadBMP("Character1/dude.bmp", Memory->DebugPlatformReadEntireFile, &thread);
@@ -173,8 +171,6 @@ extern "C" GAME_UPDATE(GameUpdate)
 		char full_frag[MAX_PATH];
 		strcpy(full_frag, asset_path->AssetPath);
 		strcat(full_frag, FragPath);
-
-
 
         State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, full_vert, full_frag, &thread);
 #endif
@@ -231,6 +227,30 @@ extern "C" GAME_UPDATE(GameUpdate)
 					}
 			}
 
+
+		// DON'T DELETE ME!!!
+#if 0
+		// Todo(Abdo): Move this to Opengl grid drawing routine
+		// TODO(Abdo): Create a full transform in this instead of just a translation
+		// 2 / number of columns
+		// 2 / number of rows
+		u32 index = 0;
+		for(f32 row_index = -1.0f;
+		    row_index < 1.0f;
+			row_index+=0.25)
+			{
+				for(f32 column_index = -1.0f;
+				    column_index < 1.0f;
+					column_index+=0.25)
+					{
+						hmm_v2 current_translation;
+						current_translation.X = column_index + 0.5f;
+						current_translation.Y = row_index + 0.5f;
+
+						State->Translations[index++] = current_translation;
+					}
+			}
+#endif
 
 		Memory->IsInitialized = true;
 	}
@@ -299,120 +319,68 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 	hmm_v2 origin = {0.0f, 0.0f};
 
-	Quadrilateral tile = {};
-	tile.Position[0] = {-0.5f, -0.5f, 0.0f}; // bottom left
-	tile.Position[1] = {0.5f, -0.5f, 0.0f}; // bottom right
-	tile.Position[2] = {0.5f, 0.5f, 0.0f}; // top right
-	tile.Position[3] = {-0.5f, 0.5f, 0.0f}; // top left
+	// TODO(Abdo): Move all this to initialization
 
-	i32 indices[] = {0, 1, 2, 2, 3, 0};
+#if 0	
+		f32 vertices[] = {-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // lower left
+		                   0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,  // lower right
+						   0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f,  // upper right
+						  -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f};   // upper left
+						  
 
+		u32 indices[] = {0, 1, 2, 2, 3, 0};						  
+#else
+		f32 vertices[] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // lower left
+		                  100.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // lower right
+						  100.0f, 100.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // upper right
+						  0.0f, 100.0f, 0.0f, 0.0f, 1.0f, 1.0f};   // upper left
+						  
+
+		u32 indices[] = {0, 1, 2, 2, 3, 0};	
+#endif
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	hmm_mat4 model = HMM_Transpose(HMM_Translate({0.0f, 0.0f, 0.0f}) *
-					 HMM_Scale({60.0f / (f32)renderer_dimensions->ScreenWidth, 60.0f / (f32)renderer_dimensions->ScreenHeight, 1.0f}));
-	hmm_mat4 view = HMM_Transpose(HMM_Translate({0.0f, 0.0f, -3.0f}));
-	//hmm_mat4 projection = HMM_Transpose(HMM_Orthographic(0.0f, (f32)renderer_dimensions->ScreenWidth, (f32)renderer_dimensions->ScreenHeight, 0.0f, 0.1f, 100.0f));
-	hmm_mat4 projection = HMM_Mat4d(1.0f);
-	hmm_mat4 model_view_projection = projection * view * model;
+	// Mote(Abdo): This library has a right handed [-1,1] coordinate system
+	// but the matrices are row major
+	// So transforms are calculated SRT instead of TRS
+	// final matrices are calculated MVP instead of PVM,.. etc
+	hmm_mat4 projection = HMM_Orthographic(0.0f, (f32)renderer_dimensions->ScreenWidth,
+	                                       0.0f, (f32)renderer_dimensions->ScreenHeight,
+										   -1.0f, 1.0f);
 
+	hmm_mat4 view = HMM_Translate({0.0f, 0.0f, -1.0f});
 
-	f32 offset = 3.0f;
-	for(i32 row_index = 0;
-	    row_index <= row_count;
-		++row_index)
-		{
-			for(i32 column_index = 0;
-				column_index <= column_count;
-				++column_index)
-				{
-#if 0					
-					tile.Position[0] = OpenGLNormalizePosition({(column_index*tile_dimms)+origin.x,
-					 											(row_index*tile_dimms)+origin.y, 0.0f},
-					                                           renderer_dimensions->ScreenWidth,
-															   renderer_dimensions->ScreenHeight);
+	hmm_mat4 model = HMM_Translate({50.0f, 480.0f, 0.0f}) * HMM_Rotate(-60.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({2.0f, 2.0f, 2.0f});
 
-					tile.Position[1] = OpenGLNormalizePosition({(column_index*tile_dimms)+(origin.x+tile_dimms),
-																(row_index*tile_dimms)+origin.y, 0.0f},
-					                                           renderer_dimensions->ScreenWidth,
-															   renderer_dimensions->ScreenHeight);
+	u32 vertex_array_object = 0;
+	glGenVertexArrays(1, &vertex_array_object);
+	glBindVertexArray(vertex_array_object);
 
-					tile.Position[2] = OpenGLNormalizePosition({(column_index*tile_dimms)+(origin.x+tile_dimms),
-																(row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f},
-					                                           renderer_dimensions->ScreenWidth,
-															   renderer_dimensions->ScreenHeight);
+	u32 vertex_buffer_object = 0;
+	glGenBuffers(1, &vertex_buffer_object);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-					tile.Position[3] = OpenGLNormalizePosition({(column_index*tile_dimms)+origin.x,
-					                                            (row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f},
-					                                           renderer_dimensions->ScreenWidth,
-															   renderer_dimensions->ScreenHeight);
-					tile.Position[0] = {(column_index*tile_dimms)+origin.x,
-					 					(row_index*tile_dimms)+origin.y, 0.0f};
+	u32 index_buffer_object = 0;
+	glGenBuffers(1, &index_buffer_object);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_object);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);	
 
-					tile.Position[1] = {(column_index*tile_dimms)+(origin.x+tile_dimms),
-										(row_index*tile_dimms)+origin.y, 0.0f};
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+	                      6 * sizeof(f32),
+						  (void *)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+	                      6 * sizeof(f32),
+						  (void *)(3 * sizeof(f32)));
+ 		
+	glBindVertexArray(vertex_array_object);
+	glUseProgram(State->shader_program);
 
-					tile.Position[2] = {(column_index*tile_dimms)+(origin.x+tile_dimms),
-										(row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f};
+	SetMat4(State->shader_program, "u_Projection", projection);
+	SetMat4(State->shader_program, "u_View", view);
+	SetMat4(State->shader_program, "u_Model", model);
 
-					tile.Position[3] = {(column_index*tile_dimms)+origin.x,
-					                    (row_index*tile_dimms)+(origin.y+tile_dimms), 0.0f};
-#else
-#if 1
-				model = HMM_Transpose(HMM_Translate({ row_index * tile_dimms, column_index * tile_dimms, 0.0f }));
-#else
-				model = HMM_Mat4d(1.0f);  
-#endif
-
-					model_view_projection = projection * view * model;
-#endif
-
-					if(((column_index % 2) == 0) && ((row_index % 2) == 0))
-					{
-						tile.Color[0] = {1.0f, 0.0f, 0.0f};															   														   															   
-						tile.Color[1] = {1.0f, 0.0f, 0.0f};															   														   															   
-						tile.Color[2] = {1.0f, 0.0f, 0.0f};															   														   															   
-						tile.Color[3] = {1.0f, 0.0f, 0.0f};
-					}
-					else
-					{
-						tile.Color[0] = {0.0f, 0.0f, 1.0f};															   														   															   
-						tile.Color[1] = {0.0f, 0.0f, 1.0f};															   														   															   
-						tile.Color[2] = {0.0f, 0.0f, 1.0f};															   														   															   
-						tile.Color[3] = {0.0f, 0.0f, 1.0f};
-					}
-
-					u32 vertex_array_object = 0;
-					glGenVertexArrays(1, &vertex_array_object);
-					glBindVertexArray(vertex_array_object);
-
-					u32 vertex_buffer_object = 0;
-					glGenBuffers(1, &vertex_buffer_object);
-					glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-					glBufferData(GL_ARRAY_BUFFER, sizeof(Quadrilateral), &tile, GL_STATIC_DRAW);
-					glEnableVertexAttribArray(0);
-					glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-					                      offsetof(Quadrilateral, Position) / sizeof(f32),
-										  (void *)(offsetof(Quadrilateral, Position)));
-					glEnableVertexAttribArray(1);
-					glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-					                      offsetof(Quadrilateral, Color) / sizeof(f32),
-										  (void *)(offsetof(Quadrilateral, Color)));										  
-
-					u32 element_buffer_object = 0;
-					glGenBuffers(1, &element_buffer_object);
-					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_object);
-					glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-					glUseProgram(State->shader_program);
-
-					SetMat4(State->shader_program, "u_Projection", projection);
-					SetMat4(State->shader_program, "u_View", view);
-					SetMat4(State->shader_program, "u_Model", model);
-
-					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-				}
-		}
-
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }

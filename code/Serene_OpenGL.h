@@ -56,8 +56,8 @@
 
 struct Quadrilateral
 {
-    hmm_v3 Position[4];
-    hmm_v3 Color[4];
+    hmm_v3 Position[3];
+    hmm_v3 Color[3];
 };
 
 #endif
