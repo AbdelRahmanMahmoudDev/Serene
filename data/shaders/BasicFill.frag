@@ -1,10 +1,15 @@
 #version 460 core
 
-in vec3 v_Color;
+in vec4 v_Color;
+in vec2 v_TextureCoordinate;
+in float v_TextureID;
 
-out vec4 o_Fragment;
+layout (location = 0) out vec4 o_Fragment;
+
+uniform sampler2D u_TextureSlots[2];
 
 void main()
 {
-    o_Fragment = vec4(v_Color.x, v_Color.y, v_Color.z, 1.0f);
+    int texture_index = int(v_TextureID);
+    o_Fragment = texture(u_TextureSlots[texture_index], v_TextureCoordinate);
 }

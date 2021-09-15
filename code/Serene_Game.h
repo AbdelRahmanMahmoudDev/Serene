@@ -24,6 +24,14 @@ struct BMPAsset
 	i32 Height;
 };
 
+struct PNGAsset
+{
+	u8 *Data;
+	i32 Width;
+	i32 Height;
+	i32 Channel_Count;
+};
+
 struct WorldPosition
 {
 	i32 TileX;
@@ -40,9 +48,14 @@ struct GameState
 	World *world;
 	MemoryArena WorldArena;
 
-	BMPAsset BackDrop;
-	BMPAsset Player;
 	u32 shader_program;
+
+	PNGAsset Grass;
+	PNGAsset Mud;
+
+	// TODO(Abdo): Move these to some kind o OpenGL Texture struct
+	u32 texture_0;
+	u32 texture_1;
 };
 
 #define SERENE_GAME_H

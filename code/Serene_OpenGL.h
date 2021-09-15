@@ -1,9 +1,8 @@
 #if !defined(SERENE_OPENGL_H)
 #define SERENE_OPENGL_H
 
-// #include "Serene_Math.h"
+#include "Serene_Platform.h"
 #include "3rd_Party/Handmade-math/HandmadeMath.h"
-
 
 // Sourced from various places on the internet
 #define WGL_CONTEXT_MAJOR_VERSION_ARB           0x2091
@@ -54,10 +53,12 @@
 #define WGL_FULL_ACCELERATION_ARB               0x2027
 #define WGL_TYPE_RGBA_ARB                       0x202B
 
-struct Quadrilateral
+struct OpenGL_Quad_Vertex
 {
-    hmm_v3 Position[3];
-    hmm_v3 Color[3];
+    hmm_v3 Position;
+    hmm_v4 Color;
+    hmm_v2 TextureCoordinate;
+    f32    TextureID;
 };
 
 #endif

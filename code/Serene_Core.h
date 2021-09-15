@@ -25,9 +25,9 @@
 #define Assert(Expression) 
 #endif
 
-#define internal static //static functions
-#define local_persist static //static local variables
-#define global static//static global variables
+#define internal static // static functions
+#define local_persist static // static local variables
+#define global static// static global variables
 
 // Number of elements in an array
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))

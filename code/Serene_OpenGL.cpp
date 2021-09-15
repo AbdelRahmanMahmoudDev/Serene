@@ -1,110 +1,17 @@
 #include "Serene_OpenGL.h"
 
-#include "Serene_Platform.h"
-
 #include "3rd_Party/Handmade-Math/HandmadeMath.h"
 
-// This normalizes a position based on a screen width and height
-// to the [-1, 1] mapping OpenGL wants
-// ignore z axis for now
-#if 0
-internal v3 
-OpenGLNormalizePosition(v3 value, u32 screen_width, u32 screen_height)
-{
-    v3 Result = {};
-
-    i32 signed_screen_width = (i32)screen_width;
-    i32 signed_screen_height = (i32)screen_height;
-
-    if(value.x < 0.0f)
-    {
-        value.x = 0.0f;
-    }
-
-    if(value.x > (f32)screen_width)
-    {
-        value.x = (f32)screen_width;
-    }
-
-    if(value.y < 0.0f)
-    {
-        value.y = 0.0f;
-    }
-
-    if(value.y > (f32)screen_height)
-    {
-        value.y = (f32)screen_height;
-    }
-
-    if(value.x == 0.0f)
-    {
-        Result.x = -1.0f;
-    }
-    else
-    {
-        if(value.x < (f32)(screen_width / 2))
-        {
-            Result.x = value.x / (f32)(-1 * signed_screen_width);
-        }
-        else if(value.x == (f32)(screen_width / 2))
-        {
-            Result.x = 0.0f;
-        }
-        else
-        {
-            Result.x = value.x / (f32)screen_width;
-        }
-    }
-
-    if(value.y == 0.0f)
-    {
-        Result.y = -1.0f;
-    }
-    else
-    {
-        if(value.y < (f32)(screen_height / 2))
-        {
-            Result.y = value.y / (f32)(-1 * signed_screen_height);
-        }
-        else if(value.y == (f32)(screen_height / 2))
-        {
-            Result.y = 0.0f;
-        }
-        else
-        {
-            Result.y = value.y / (f32)screen_height;
-        }
-    }
-    return(Result);
-}
-#endif
-
+// Load shader files, parse them and output a shader program
 internal u32 
 OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path, char *fragment_path, ThreadContext *thread)
 {
     // Read our shaders into the appropriate buffers
     u32 Result = 0;
 
-    #if 1
     DebugPlatformReadFileResult vertex_code = pRead_File(thread, vertex_path);
     DebugPlatformReadFileResult fragment_code = pRead_File(thread, fragment_path);
-    #else
-    char *vertexShaderSource = "#version 460 core\n"
-        "layout (location = 0) in vec3 aPos;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-        "}\0";
-    char *fragmentShaderSource = "#version 460 core\n"
-        "out vec4 FragColor;\n"
-        "void main()\n"
-        "{\n"
-        "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-        "}\n\0";
 
-    char *vertex_source = vertexShaderSource;
-    char *fragment_source = fragmentShaderSource;
-    #endif
     // Create an empty vertex shader handle
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 
@@ -212,29 +119,96 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
 }
 
 internal void
-SetFloat(u32 shader_handle, char *uniform_name, f32 value)
+OpenGLUploadTexture(PNGAsset *image, u32 &texture_id)
+{
+    if(image->Data)
+    {
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_2D, texture_id);
+        
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);    
+
+		u32 gl_format = image->Channel_Count == 4 ? GL_RGBA : GL_RGB;
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image->Width, image->Height, 0, gl_format, GL_UNSIGNED_BYTE, image->Data);            
+    }
+    else
+    {
+        // image loaded incorrectly
+        // TODO(Abdo): Logging
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+//                                    Uniform uploads
+////////////////////////////////////////////////////////////////////////////////////////////
+internal void
+OpenGLSetFloat(u32 shader_handle, char *uniform_name, f32 value)
 {
     i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
     glUniform1f(uniform_location, value);
 }
 
 internal void
-SetVec2(u32 shader_handle, char *uniform_name, hmm_v2 value) 
+OpenGLSetVec2(u32 shader_handle, char *uniform_name, hmm_v2 value) 
 {
     i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
     glUniform2f(uniform_location, value.X, value.Y);
 }
 
 internal void
-SetInt(u32 shader_handle, char *uniform_name, i32 value)
+OpenGLSetInt(u32 shader_handle, char *uniform_name, i32 value)
 {
     i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
     glUniform1i(uniform_location, value);
 }
 
 internal void
-SetMat4(u32 shader_handle, char *uniform_name, hmm_m4 matrix)
+OpenGLSetIntArray(u32 shader_handle, char *uniform_name, i32 count , i32 *value)
+{
+    i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
+   //glUniform1i(uniform_location, value);
+   glUniform1iv(uniform_location, count, value);
+}
+
+internal void
+OpenGLSetMat4(u32 shader_handle, char *uniform_name, hmm_m4 matrix)
 {
     i32 unifrom_location = glGetUniformLocation(shader_handle, uniform_name);
     glUniformMatrix4fv(unifrom_location, 1, GL_FALSE, (f32 *)matrix.Elements);
+}
+////////////////////////////////////////////////////////////////////////////////////////////
+//                                    Uniform uploads
+////////////////////////////////////////////////////////////////////////////////////////////
+
+internal OpenGL_Quad_Vertex *
+OpenGLCreateQuad(OpenGL_Quad_Vertex *data_pointer, hmm_v3 bottom_left_corner, f32 size, hmm_v4 color, f32 texture_id)
+{
+    data_pointer->Position = {bottom_left_corner.X, bottom_left_corner.Y, 0.0f};
+    data_pointer->Color = color;
+    data_pointer->TextureCoordinate = {0.0f, 0.0f};
+    data_pointer->TextureID = texture_id;
+    data_pointer++;
+
+    data_pointer->Position = {bottom_left_corner.X + size, bottom_left_corner.Y, 0.0f};
+    data_pointer->Color = color;
+    data_pointer->TextureCoordinate = {1.0f, 0.0f};
+    data_pointer->TextureID = texture_id;
+    data_pointer++;
+
+    data_pointer->Position = {bottom_left_corner.X + size, bottom_left_corner.Y + size, 0.0f};
+    data_pointer->Color = color;
+    data_pointer->TextureCoordinate = {1.0f, 1.0f};
+    data_pointer->TextureID = texture_id;
+    data_pointer++;
+
+    data_pointer->Position = {bottom_left_corner.X, bottom_left_corner.Y + size, 0.0f};
+    data_pointer->Color = color;
+    data_pointer->TextureCoordinate = {0.0f, 1.0f};
+    data_pointer->TextureID = texture_id;
+    data_pointer++;
+
+    return data_pointer;
 }

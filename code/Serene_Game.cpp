@@ -8,6 +8,9 @@
 #include "Serene_OpenGL.h"
 #include "Serene_OpenGL.cpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "3rd_Party/stb_image/stb_image.h"
+
 // The game layer is currently only responsible for filling the sound buffer
 // Sound play and update is managed by the OS
 extern "C" GAME_GENERATE_AUDIO(GameGenerateAudio)
@@ -40,82 +43,13 @@ PushSize_(MemoryArena *arena, MemoryIndex size)
 
 #include "Serene_Tiles.cpp"
 
-// struct members pulled from https://www.fileformat.info/format/bmp/egff.htm
-// web page includes information about the file format
-#pragma pack(push, 1)
-struct BMPHeader
+// TODO(Abdo): collapse this into another function in the asset system
+internal void
+ConstructAssetDirectory(char *desired_path, char *asset_path, char *resource_path)
 {
-	u16 FileType;        /* File type, always ("BM") */
-	u32 FileSize;        /* Size of the file in bytes */
-	u16 Reserved1;       /* Always 0 */
-	u16 Reserved2;       /* Always 0 */
-	u32 BitmapOffset;    /* Starting position of image data in bytes */
-	u32 Size;            /* Size of this header in bytes */
-	i32 Width;           /* Image width in pixels */
-	i32 Height;          /* Image height in pixels */
-	u16 Planes;          /* Number of color planes */
-	u16 BitsPerPixel;    /* Number of bits per pixel */
-	u32 Compression;     /* Compression methods used */
-	u32 SizeOfBitmap;    /* Size of bitmap in bytes */
-	i32 HorzResolution;  /* Horizontal resolution in pixels per meter */
-	i32 VertResolution;  /* Vertical resolution in pixels per meter */
-	u32 ColorsUsed;      /* Number of colors in the image */
-	u32 ColorsImportant; /* Minimum number of important colors */
-	u32 RedMask;         /* Mask identifying bits of red component */
-	u32 GreenMask;       /* Mask identifying bits of green component */
-	u32 BlueMask;        /* Mask identifying bits of blue component */
-};
-#pragma pack(pop)
-
-
-internal BMPAsset
-DEBUGLoadBMP(char *path, debug_platform_read_entire_file *pReadEntireFile, ThreadContext *thread)
-{
-	BMPAsset Result = {};
-	DebugPlatformReadFileResult read_result = pReadEntireFile(thread, path);
-
-	if(read_result.ContentSize != 0)
-	{
-		BMPHeader *bitmap_header = (BMPHeader *)read_result.Content;
-		u32 *pixels = (u32 *)((u8 *)read_result.Content + bitmap_header->BitmapOffset);
-		Result.Pixels = pixels;
-		Result.Width = bitmap_header->Width;
-		Result.Height = bitmap_header->Height;
-
-		Assert(bitmap_header->Compression == 3);
-
-		u32 red_mask = bitmap_header->RedMask;
-		u32 green_mask = bitmap_header->GreenMask;
-		u32 blue_mask = bitmap_header->BlueMask;
-		u32 alpha_mask = ~(red_mask | green_mask | blue_mask);
-
-		BitScanResult red_shift = FindLeastSignificantSetBit32(red_mask); 
-		BitScanResult green_shift = FindLeastSignificantSetBit32(green_mask); 
-		BitScanResult blue_shift = FindLeastSignificantSetBit32(blue_mask); 
-		BitScanResult alpha_shift = FindLeastSignificantSetBit32(alpha_mask); 
-
-		Assert(red_shift.IsFound);
-		Assert(green_shift.IsFound);
-		Assert(blue_shift.IsFound);
-		Assert(alpha_shift.IsFound);
-
-		u32 *SourceDest = pixels;
-		for(i32 y = 0; y < bitmap_header->Height; ++y)
-		{
-			for(i32 x = 0; x < bitmap_header->Width; ++x)
-			{
-                u32 C = *SourceDest;
-                *SourceDest++ = ((((C >> alpha_shift.Index) & 0xFF) << 24) |
-                                 (((C >> red_shift.Index) & 0xFF) << 16) |
-                                 (((C >> green_shift.Index) & 0xFF) << 8) |
-                                 (((C >> blue_shift.Index) & 0xFF) << 0));
-			}
-		}
-	}
-
-	return Result;
+	strcpy(desired_path, asset_path);
+	strcat(desired_path, resource_path);
 }
-
 
 extern "C" GAME_UPDATE(GameUpdate)
 {
@@ -157,23 +91,34 @@ extern "C" GAME_UPDATE(GameUpdate)
 		ThreadContext thread = {};
         
 		// Loading game assets
-#if 0
-		State->BackDrop = DEBUGLoadBMP("assets/test_background.bmp", Memory->DebugPlatformReadEntireFile, &thread);
-		State->Player = DEBUGLoadBMP("Character1/dude.bmp", Memory->DebugPlatformReadEntireFile, &thread);
-#else
-		#define MAX_PATH 260
-		char *VertPath = "/Shaders/BasicFill.vert";
-		char full_vert[MAX_PATH];
-		strcpy(full_vert, asset_path->AssetPath);
-		strcat(full_vert, VertPath);
+		// NOTE(Abdo): Right now, assets are being loaded onto the stack or using a separate heap allocation using CRT
+		// In the future, this should be allocated on a memory arena that we control
+		// TODO(Abdo): modify stb_image.h to allocate stuff on the memory arena
+		// TODO(Abdo): Asset system!!!!
+		char vertex_shader_path[MAX_PATH];
+		ConstructAssetDirectory(vertex_shader_path, asset_path->AssetPath, "/Shaders/BasicFill.vert");
 
-		char *FragPath = "/Shaders/BasicFill.frag";
-		char full_frag[MAX_PATH];
-		strcpy(full_frag, asset_path->AssetPath);
-		strcat(full_frag, FragPath);
+		char fragment_shader_path[MAX_PATH];
+		ConstructAssetDirectory(fragment_shader_path, asset_path->AssetPath, "/Shaders/BasicFill.frag");
 
-        State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, full_vert, full_frag, &thread);
-#endif
+        State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, vertex_shader_path, fragment_shader_path, &thread);
+
+		stbi_set_flip_vertically_on_load(1);
+
+		char grass_path[MAX_PATH];
+		ConstructAssetDirectory(grass_path, asset_path->AssetPath, "/assets/textures/Grass.png");
+		State->Grass = {};
+		State->Grass.Data = stbi_load(grass_path, &State->Grass.Width, &State->Grass.Height, &State->Grass.Channel_Count, 0);
+		OpenGLUploadTexture(&State->Grass, State->texture_0);
+		stbi_image_free(State->Grass.Data);		
+
+		char mud_path[MAX_PATH];
+		ConstructAssetDirectory(mud_path, asset_path->AssetPath, "/assets/Textures/Mud.png");
+		State->Mud = {};
+		State->Mud.Data = stbi_load(mud_path, &State->Mud.Width, &State->Mud.Height, &State->Mud.Channel_Count, 0);
+		OpenGLUploadTexture(&State->Mud, State->texture_1);
+		stbi_image_free(State->Mud.Data);
+
 		// Setting up memory arenas
 		InitializeArena(&State->WorldArena,
 					 	Memory->PermanentStorageSize - sizeof(GameState),
@@ -184,7 +129,8 @@ extern "C" GAME_UPDATE(GameUpdate)
 		world->Tiles = PushStruct(&State->WorldArena, TileMap);
 		TileMap *tile_map = world->Tiles;
 		
-		
+		// NOTE(Abdo): This tile map struct is outdated!!
+		// TODO(Abdo): Reconstruct this to fit new world structure
 		tile_map->ChunkShift = 8;
 		tile_map->ChunkMask = (1 << tile_map->ChunkShift) - 1;
 		tile_map->ChunkDimm = 1 << tile_map->ChunkShift;
@@ -230,7 +176,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 		// DON'T DELETE ME!!!
 #if 0
-		// Todo(Abdo): Move this to Opengl grid drawing routine
+		// TODO(Abdo): Move this to Opengl grid drawing routine
 		// TODO(Abdo): Create a full transform in this instead of just a translation
 		// 2 / number of columns
 		// 2 / number of rows
@@ -321,66 +267,99 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 	// TODO(Abdo): Move all this to initialization
 
-#if 0	
-		f32 vertices[] = {-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // lower left
-		                   0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,  // lower right
-						   0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f,  // upper right
-						  -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f};   // upper left
-						  
-
-		u32 indices[] = {0, 1, 2, 2, 3, 0};						  
-#else
-		f32 vertices[] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // lower left
-		                  100.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // lower right
-						  100.0f, 100.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // upper right
-						  0.0f, 100.0f, 0.0f, 0.0f, 1.0f, 1.0f};   // upper left
-						  
-
-		u32 indices[] = {0, 1, 2, 2, 3, 0};	
-#endif
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	// Mote(Abdo): This library has a right handed [-1,1] coordinate system
 	// but the matrices are row major
 	// So transforms are calculated SRT instead of TRS
 	// final matrices are calculated MVP instead of PVM,.. etc
-	hmm_mat4 projection = HMM_Orthographic(0.0f, (f32)renderer_dimensions->ScreenWidth,
-	                                       0.0f, (f32)renderer_dimensions->ScreenHeight,
+	hmm_mat4 projection = HMM_Orthographic(((f32)renderer_dimensions->ScreenWidth / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenWidth / 2.0f,
+	                                       ((f32)renderer_dimensions->ScreenHeight / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenHeight / 2.0f,
 										   -1.0f, 1.0f);
 
 	hmm_mat4 view = HMM_Translate({0.0f, 0.0f, -1.0f});
 
-	hmm_mat4 model = HMM_Translate({50.0f, 480.0f, 0.0f}) * HMM_Rotate(-60.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({2.0f, 2.0f, 2.0f});
+	hmm_mat4 model = HMM_Translate({0.0f, 0.0f, 0.0f}) * HMM_Rotate(0.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({1.0f, 1.0f, 1.0f});
 
 	u32 vertex_array_object = 0;
 	glGenVertexArrays(1, &vertex_array_object);
 	glBindVertexArray(vertex_array_object);
 
+#define MAX_QUAD_COUNT 1000
+#define MAX_VERTEX_COUNT MAX_QUAD_COUNT * 4
+#define MAX_INDEX_COUNT MAX_QUAD_COUNT * 6
+
 	u32 vertex_buffer_object = 0;
 	glGenBuffers(1, &vertex_buffer_object);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, MAX_VERTEX_COUNT * sizeof(OpenGL_Quad_Vertex), 0, GL_DYNAMIC_DRAW);
+
+	OpenGL_Quad_Vertex Vertices[MAX_VERTEX_COUNT];
+	OpenGL_Quad_Vertex *buffer = Vertices;
+
+	u32 index_data[MAX_INDEX_COUNT];
+	u32 offset = 0;
+	for(int index = 0;
+	    index < MAX_INDEX_COUNT;
+		index += 6)
+		{
+			index_data[0 + index] = 0 + offset; 
+			index_data[1 + index] = 1 + offset; 
+			index_data[2 + index] = 2 + offset; 
+			index_data[3 + index] = 2 + offset; 
+			index_data[4 + index] = 3 + offset; 
+			index_data[5 + index] = 0 + offset; 
+
+			offset += 4;
+		}
 
 	u32 index_buffer_object = 0;
 	glGenBuffers(1, &index_buffer_object);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_object);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);	
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_data), index_data, GL_DYNAMIC_DRAW);	
+
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-	                      6 * sizeof(f32),
-						  (void *)0);
+	                      sizeof(OpenGL_Quad_Vertex),
+						  (void *)offsetof(OpenGL_Quad_Vertex, Position));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-	                      6 * sizeof(f32),
-						  (void *)(3 * sizeof(f32)));
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
+	                      sizeof(OpenGL_Quad_Vertex),
+						  (void *)offsetof(OpenGL_Quad_Vertex, Color));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
+	                      sizeof(OpenGL_Quad_Vertex),
+						  (void *)offsetof(OpenGL_Quad_Vertex, TextureCoordinate));
+
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
+	                      sizeof(OpenGL_Quad_Vertex),
+						  (void *)offsetof(OpenGL_Quad_Vertex, TextureID));						  					  
  		
+	glBindTextureUnit(0, State->texture_0);
+	glBindTextureUnit(1, State->texture_1);
+	
+	u32 index_count = 0;
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
+	buffer = OpenGLCreateQuad(buffer, {100.0f, 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 0.0f);
+	index_count += 6;
+	buffer = OpenGLCreateQuad(buffer, {-100.0f, 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	index_count += 6;
+	buffer = OpenGLCreateQuad(buffer, {0.0f, 100.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+	index_count += 6;
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertices), Vertices);
+
 	glBindVertexArray(vertex_array_object);
 	glUseProgram(State->shader_program);
 
-	SetMat4(State->shader_program, "u_Projection", projection);
-	SetMat4(State->shader_program, "u_View", view);
-	SetMat4(State->shader_program, "u_Model", model);
+	i32 texture_slots[2] = {0, 1};
 
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	OpenGLSetMat4(State->shader_program, "u_Projection", projection);
+	OpenGLSetMat4(State->shader_program, "u_View", view);
+	OpenGLSetMat4(State->shader_program, "u_Model", model);
+	OpenGLSetIntArray(State->shader_program, "u_TextureSlots", 2, texture_slots);
+
+	glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
 }
