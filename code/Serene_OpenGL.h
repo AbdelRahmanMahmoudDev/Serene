@@ -61,4 +61,30 @@ struct OpenGL_Quad_Vertex
     f32    TextureID;
 };
 
+struct OpenGL_Batch_State
+{
+    u32 vertex_array_object;
+    u32 vertex_buffer_object;
+    u32 index_buffer_object;
+    u32 shader_program;
+    u32 white_texture_handle;
+    u32 texture_slot_index;
+
+    hmm_mat4 projection;
+    hmm_mat4 view;
+    hmm_mat4 transform;
+
+    i32 max_texture_slot_count;
+    u32 max_quad_count;
+    u32 max_vertex_count;
+    u32 max_index_count;
+    u32 current_index_count;
+
+    OpenGL_Quad_Vertex *vertex_data_base;
+    OpenGL_Quad_Vertex *vertex_data_ptr;
+
+    u32 *texture_slot_base;
+    i32 *texture_sampler_base;
+};
+
 #endif

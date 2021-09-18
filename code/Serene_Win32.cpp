@@ -673,17 +673,6 @@ Win32UnloadGameDLL(Win32GameCode *GameCode)
 	GameCode->GameGenerateAudio = 0;
 }
 
-Win32WindowDimensions
-Win32GetWindowDimensions(HWND handle)
-{
-	Win32WindowDimensions Result = {};
-	RECT ClientRect;
-    GetClientRect(handle, &ClientRect);
-    Result.Width = ClientRect.right - ClientRect.left;
-    Result.Height = ClientRect.bottom - ClientRect.top;
-	return Result;
-}
-
 LRESULT CALLBACK
 WindowsCallBack(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 { 
@@ -779,9 +768,9 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	DrawableRect.right = 1280;
 	DrawableRect.bottom = 720;
 
-	Win32WindowDimensions window_dimensions = {};
-	window_dimensions.Width = DrawableRect.right;
-	window_dimensions.Height = DrawableRect.bottom;
+	Win32WindowData window_data = {};
+	window_data.Width = DrawableRect.right;
+	window_data.Height = DrawableRect.bottom;
 
 	DWORD window_style = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 	AdjustWindowRect(&DrawableRect, window_style, 0);
@@ -839,7 +828,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 
 		Memory.DebugPlatformReadEntireFile = DebugPlatformReadEntireFile;
 		Memory.DebugPlatformWriteEntireFile = DebugPlatformWriteEntireFile;
-		Memory.PermanentStorageSize = MEGABYTES(64);
+		Memory.PermanentStorageSize = MEGABYTES(700);
 		Memory.TransientStorageSize = GIGABYTES(1);
 		Win32_State.TotalSize = Memory.TransientStorageSize + Memory.PermanentStorageSize;
 
@@ -849,7 +838,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		Assert(Memory.PermanentStorage && Memory.TransientStorage);
 
 		// Allocate audio memory
-		// TODO(abdo): This should be pooled with our other memory
+		// TODO(abdo): This should be pooled with other disk i/o
 		Win32Sound.SoundData = (u8*)VirtualAlloc(0, Win32Sound.SoundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 		Assert(Win32Sound.SoundData);
 
@@ -865,9 +854,9 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		Win32SubmitAudio(&Win32Sound);
         Win32Sound.Win32SourceVoice->Start();
 
-		GameRendererDimensons game_renderer_dimensions = {};
-		game_renderer_dimensions.ScreenWidth = window_dimensions.Width;
-		game_renderer_dimensions.ScreenHeight = window_dimensions.Height;
+		GameRendererDimensions game_renderer_dimensions = {};
+		game_renderer_dimensions.ScreenWidth = window_data.Width;
+		game_renderer_dimensions.ScreenHeight = window_data.Height;
 
 		//Setup Input
 		GameInput Input[2] = {};

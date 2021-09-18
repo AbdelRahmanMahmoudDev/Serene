@@ -14,7 +14,7 @@ struct Win32SoundOutput
 	u8* SoundData;
 };
 
-struct Win32WindowDimensions
+struct Win32WindowData
 {
 	u32 Width;
 	u32 Height;

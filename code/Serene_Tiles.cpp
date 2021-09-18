@@ -100,12 +100,3 @@ RecanonicalizePosition(TileMap *tile_map, WorldPosition position)
 
 	return Result;
 }
-
-internal void
-InitializeArena(MemoryArena *arena, MemoryIndex size, u8 *base)
-{
-	arena->Base = base;
-	arena->Size = size;
-	arena->Used = 0;
-}
-

@@ -12,12 +12,12 @@ out float v_TextureID;
 // uniform mat4 u_ModelViewProjection;
 uniform mat4 u_Projection;
 uniform mat4 u_View;
-uniform mat4 u_Model;
+uniform mat4 u_Transform;
 
 void main()
 {
     v_Color = a_Color;
     v_TextureCoordinate = a_TextureCoordinate;
     v_TextureID = a_TextureID;
-    gl_Position = u_Projection * u_View * u_Model * vec4(a_Position.x, a_Position.y, 0.0f, 1.0f);
+    gl_Position = u_Projection * u_View * u_Transform * vec4(a_Position, 1.0f);
 }

@@ -1,6 +1,7 @@
 #include "Serene_Game.h"
 #include "Serene_Platform.h"
 #include "Serene_Intrinsics.h"
+#include "Serene_Memory.cpp"
 
 #include "3rd_Party/Handmade-Math/HandmadeMath.h"
 #include "3rd_Party/glad/glad/glad.h"
@@ -29,17 +30,7 @@ extern "C" GAME_GENERATE_AUDIO(GameGenerateAudio)
 	}
 }
 
-#define PushStruct(Arena, type) (type *)PushSize_(Arena, sizeof(type))
-#define PushArray(Arena, Count, type) (type *)PushSize_(Arena, (Count)*sizeof(type))
-void *
-PushSize_(MemoryArena *arena, MemoryIndex size)
-{
-    Assert((arena->Used + size) <= arena->Size); // Don't overflow your arena
-    void *Result = arena->Base + arena->Used; // Retrieve a pointer to the latest memory index before adding the memory
-   	arena->Used += size; // add the new size to our index
-    
-    return(Result);
-}
+
 
 #include "Serene_Tiles.cpp"
 
@@ -101,34 +92,41 @@ extern "C" GAME_UPDATE(GameUpdate)
 		char fragment_shader_path[MAX_PATH];
 		ConstructAssetDirectory(fragment_shader_path, asset_path->AssetPath, "/Shaders/BasicFill.frag");
 
-        State->shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, vertex_shader_path, fragment_shader_path, &thread);
+        State->opengl_batch.shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, vertex_shader_path, fragment_shader_path, &thread);
 
 		stbi_set_flip_vertically_on_load(1);
-
+		
+		//stb uses malloc and delete
+		// TODO(Abdo): make stb use our asset allocater;
 		char grass_path[MAX_PATH];
 		ConstructAssetDirectory(grass_path, asset_path->AssetPath, "/assets/textures/Grass.png");
 		State->Grass = {};
 		State->Grass.Data = stbi_load(grass_path, &State->Grass.Width, &State->Grass.Height, &State->Grass.Channel_Count, 0);
-		OpenGLUploadTexture(&State->Grass, State->texture_0);
-		stbi_image_free(State->Grass.Data);		
+		State->texture_0 = OpenGLCreateTexture(&State->Grass);
 
 		char mud_path[MAX_PATH];
 		ConstructAssetDirectory(mud_path, asset_path->AssetPath, "/assets/Textures/Mud.png");
 		State->Mud = {};
 		State->Mud.Data = stbi_load(mud_path, &State->Mud.Width, &State->Mud.Height, &State->Mud.Channel_Count, 0);
-		OpenGLUploadTexture(&State->Mud, State->texture_1);
-		stbi_image_free(State->Mud.Data);
+		State->texture_1 = OpenGLCreateTexture(&State->Mud);
 
 		// Setting up memory arenas
 		InitializeArena(&State->WorldArena,
-					 	Memory->PermanentStorageSize - sizeof(GameState),
-						(u8*)Memory->PermanentStorage + sizeof(GameState));
+					 	MEGABYTES(10),
+						(u8 *)Memory->PermanentStorage + sizeof(GameState));
+
+		InitializeArena(&State->RendererArena,
+		                MEGABYTES(500),
+						(u8 *)Memory->PermanentStorage + sizeof(GameState) + MEGABYTES(10));						
 
 		State->world = PushStruct(&State->WorldArena, World);
 		World *world = State->world;
 		world->Tiles = PushStruct(&State->WorldArena, TileMap);
 		TileMap *tile_map = world->Tiles;
 		
+		u32 max_quad_count = 1000;
+		OpenGLInitRenderer(renderer_dimensions, &State->opengl_batch, &State->RendererArena, max_quad_count);
+
 		// NOTE(Abdo): This tile map struct is outdated!!
 		// TODO(Abdo): Reconstruct this to fit new world structure
 		tile_map->ChunkShift = 8;
@@ -173,34 +171,8 @@ extern "C" GAME_UPDATE(GameUpdate)
 					}
 			}
 
-
-		// DON'T DELETE ME!!!
-#if 0
-		// TODO(Abdo): Move this to Opengl grid drawing routine
-		// TODO(Abdo): Create a full transform in this instead of just a translation
-		// 2 / number of columns
-		// 2 / number of rows
-		u32 index = 0;
-		for(f32 row_index = -1.0f;
-		    row_index < 1.0f;
-			row_index+=0.25)
-			{
-				for(f32 column_index = -1.0f;
-				    column_index < 1.0f;
-					column_index+=0.25)
-					{
-						hmm_v2 current_translation;
-						current_translation.X = column_index + 0.5f;
-						current_translation.Y = row_index + 0.5f;
-
-						State->Translations[index++] = current_translation;
-					}
-			}
-#endif
-
 		Memory->IsInitialized = true;
 	}
-    
 	World *world = State->world;
 	TileMap *tile_map = world->Tiles;
 
@@ -265,101 +237,33 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 	hmm_v2 origin = {0.0f, 0.0f};
 
-	// TODO(Abdo): Move all this to initialization
-
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	// Mote(Abdo): This library has a right handed [-1,1] coordinate system
-	// but the matrices are row major
-	// So transforms are calculated SRT instead of TRS
-	// final matrices are calculated MVP instead of PVM,.. etc
-	hmm_mat4 projection = HMM_Orthographic(((f32)renderer_dimensions->ScreenWidth / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenWidth / 2.0f,
-	                                       ((f32)renderer_dimensions->ScreenHeight / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenHeight / 2.0f,
-										   -1.0f, 1.0f);
+	OpenGLPushFlatQuad(&State->opengl_batch, {0.0f , 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {125.0f , 0.0f, 0.0f}, 100.0f, {0.0f, 1.0f, 0.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {-125.0f , 0.0f, 0.0f}, 100.0f, {0.0f, 0.0f, 1.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {250.0f , 0.0f, 0.0f}, 100.0f, {1.0f, 1.0f, 0.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {-250.0f , 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 1.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {0.0f , -150.0f, 0.0f}, 100.0f, {0.0f, 1.0f, 1.0f, 1.0f});
 
-	hmm_mat4 view = HMM_Translate({0.0f, 0.0f, -1.0f});
-
-	hmm_mat4 model = HMM_Translate({0.0f, 0.0f, 0.0f}) * HMM_Rotate(0.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({1.0f, 1.0f, 1.0f});
-
-	u32 vertex_array_object = 0;
-	glGenVertexArrays(1, &vertex_array_object);
-	glBindVertexArray(vertex_array_object);
-
-#define MAX_QUAD_COUNT 1000
-#define MAX_VERTEX_COUNT MAX_QUAD_COUNT * 4
-#define MAX_INDEX_COUNT MAX_QUAD_COUNT * 6
-
-	u32 vertex_buffer_object = 0;
-	glGenBuffers(1, &vertex_buffer_object);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-	glBufferData(GL_ARRAY_BUFFER, MAX_VERTEX_COUNT * sizeof(OpenGL_Quad_Vertex), 0, GL_DYNAMIC_DRAW);
-
-	OpenGL_Quad_Vertex Vertices[MAX_VERTEX_COUNT];
-	OpenGL_Quad_Vertex *buffer = Vertices;
-
-	u32 index_data[MAX_INDEX_COUNT];
-	u32 offset = 0;
-	for(int index = 0;
-	    index < MAX_INDEX_COUNT;
-		index += 6)
-		{
-			index_data[0 + index] = 0 + offset; 
-			index_data[1 + index] = 1 + offset; 
-			index_data[2 + index] = 2 + offset; 
-			index_data[3 + index] = 2 + offset; 
-			index_data[4 + index] = 3 + offset; 
-			index_data[5 + index] = 0 + offset; 
-
-			offset += 4;
-		}
-
-	u32 index_buffer_object = 0;
-	glGenBuffers(1, &index_buffer_object);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_object);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_data), index_data, GL_DYNAMIC_DRAW);	
-
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-	                      sizeof(OpenGL_Quad_Vertex),
-						  (void *)offsetof(OpenGL_Quad_Vertex, Position));
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
-	                      sizeof(OpenGL_Quad_Vertex),
-						  (void *)offsetof(OpenGL_Quad_Vertex, Color));
-
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
-	                      sizeof(OpenGL_Quad_Vertex),
-						  (void *)offsetof(OpenGL_Quad_Vertex, TextureCoordinate));
-
-	glEnableVertexAttribArray(3);
-	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
-	                      sizeof(OpenGL_Quad_Vertex),
-						  (void *)offsetof(OpenGL_Quad_Vertex, TextureID));						  					  
- 		
-	glBindTextureUnit(0, State->texture_0);
-	glBindTextureUnit(1, State->texture_1);
+	OpenGLPushTexturedQuad(&State->opengl_batch, {125.0f, -200.0f, 0.0f}, 100.0f, State->texture_0);
+	OpenGLPushTexturedQuad(&State->opengl_batch, {-125.0f, -200.0f, 0.0f}, 100.0f, State->texture_1);
+	OpenGLFlush(&State->opengl_batch);
 	
-	u32 index_count = 0;
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-	buffer = OpenGLCreateQuad(buffer, {100.0f, 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 0.0f);
-	index_count += 6;
-	buffer = OpenGLCreateQuad(buffer, {-100.0f, 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	index_count += 6;
-	buffer = OpenGLCreateQuad(buffer, {0.0f, 100.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
-	index_count += 6;
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertices), Vertices);
-
-	glBindVertexArray(vertex_array_object);
-	glUseProgram(State->shader_program);
-
-	i32 texture_slots[2] = {0, 1};
-
-	OpenGLSetMat4(State->shader_program, "u_Projection", projection);
-	OpenGLSetMat4(State->shader_program, "u_View", view);
-	OpenGLSetMat4(State->shader_program, "u_Model", model);
-	OpenGLSetIntArray(State->shader_program, "u_TextureSlots", 2, texture_slots);
-
-	glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
+#if 0
+	// Draws a grid of quads
+	// TODO(Abdo): Pull this out into a function that can easily sample from a texture atlas and draw basic levels
+	for (f32 y = -360.0f;
+		y < 360.0f;
+		y += 100.0f)
+	{
+		for(f32 x = -640.0f;
+		   x < 640.0f;
+		   x += 100.0f)
+		{
+			buffer = OpenGLCreateQuad(buffer, {x, y, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 0.0f);
+			index_count += 6;
+		}
+	}
+#endif
 }

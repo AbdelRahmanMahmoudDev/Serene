@@ -106,10 +106,12 @@ typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
 #define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(ThreadContext* Thread, void* FreeableMemory)
 typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platform_free_file_memory);
 
-struct GameRendererDimensons
+struct GameRendererDimensions
 {
     u32 ScreenWidth;
     u32 ScreenHeight;
+
+	// 2 dimensional vector
 };
 
 struct GameAssetPath
@@ -117,12 +119,11 @@ struct GameAssetPath
 	char *AssetPath;
 };
 
-/*
-Permanent Storage is data that persists between frames
-Transient Storage is data that doesn't necessarily live in memory between frames (disk i/o)
-IMPORTANT: All storage must be cleared to zero at startup
-Debug file functions are stored here
-*/
+
+// Permanent Storage is data that persists between frames (Game state, renderer buffer)
+// Transient Storage is data that doesn't necessarily live in memory between frames (disk i/o)
+// IMPORTANT(Abdo): All storage must be cleared to zero at startup
+// Debug file functions are stored here
 struct GameMemory
 {
 	b32 IsInitialized;
@@ -144,7 +145,7 @@ struct GameMemory
 #define GAME_GENERATE_AUDIO(name) void name(ThreadContext* Thread, GameSoundOutput* SoundOutput)
 typedef GAME_GENERATE_AUDIO(game_generate_audio);
 
-#define GAME_UPDATE(name) void name(ThreadContext* Thread, GameMemory* Memory, GameRendererDimensons *renderer_dimensions, GameInput* Input, GameSoundOutput* SoundOutput, GameAssetPath *asset_path)
+#define GAME_UPDATE(name) void name(ThreadContext* Thread, GameMemory* Memory, GameRendererDimensions *renderer_dimensions, GameInput* Input, GameSoundOutput* SoundOutput, GameAssetPath *asset_path)
 typedef GAME_UPDATE(game_update);
 
 // Note(abdo): These functions were taken from HandmadeHero for educational purposes only

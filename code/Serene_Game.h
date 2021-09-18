@@ -46,13 +46,16 @@ struct GameState
 	WorldPosition PlayerPos;
 	hmm_v2 PlayerVelocity;
 	World *world;
+
 	MemoryArena WorldArena;
+	MemoryArena RendererArena;
 
 	u32 shader_program;
 
 	PNGAsset Grass;
 	PNGAsset Mud;
 
+	OpenGL_Batch_State opengl_batch;
 	// TODO(Abdo): Move these to some kind o OpenGL Texture struct
 	u32 texture_0;
 	u32 texture_1;
