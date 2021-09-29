@@ -310,7 +310,7 @@ OpenGLInitRenderer(GameRendererDimensions *renderer_dimensions, OpenGL_Batch_Sta
 // advances vertex data pointer
 // uploads vertices and issues draw call ONLY if max index count reached
 internal void
-OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, f32 size, hmm_v4 color)
+OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, hmm_v2 dimensions, hmm_v4 color)
 {
     if(batch_state->current_index_count >= batch_state->max_index_count)
     {
@@ -344,19 +344,19 @@ OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, f
     batch_state->vertex_data_ptr->TextureID = texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + size, bottom_left_corner.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 0.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + size, bottom_left_corner.Y + size, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y + size, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {0.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;

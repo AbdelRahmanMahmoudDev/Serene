@@ -239,12 +239,13 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	OpenGLPushFlatQuad(&State->opengl_batch, {0.0f , 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {125.0f , 0.0f, 0.0f}, 100.0f, {0.0f, 1.0f, 0.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {-125.0f , 0.0f, 0.0f}, 100.0f, {0.0f, 0.0f, 1.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {250.0f , 0.0f, 0.0f}, 100.0f, {1.0f, 1.0f, 0.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {-250.0f , 0.0f, 0.0f}, 100.0f, {1.0f, 0.0f, 1.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {0.0f , -150.0f, 0.0f}, 100.0f, {0.0f, 1.0f, 1.0f, 1.0f});
+	// Maybe the OpenGL batch state should be defined only once??
+	OpenGLPushFlatQuad(&State->opengl_batch, {0.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {125.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {0.0f, 1.0f, 0.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {-125.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {0.0f, 0.0f, 1.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {250.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {1.0f, 1.0f, 0.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {-250.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {1.0f, 0.0f, 1.0f, 1.0f});
+	OpenGLPushFlatQuad(&State->opengl_batch, {-400.0f , -350.0f, 0.0f}, {500.0f, 100.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
 
 	OpenGLPushTexturedQuad(&State->opengl_batch, {125.0f, -200.0f, 0.0f}, 100.0f, State->texture_0);
 	OpenGLPushTexturedQuad(&State->opengl_batch, {-125.0f, -200.0f, 0.0f}, 100.0f, State->texture_1);
