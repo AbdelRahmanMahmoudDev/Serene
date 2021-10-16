@@ -53,6 +53,14 @@
 #define WGL_FULL_ACCELERATION_ARB               0x2027
 #define WGL_TYPE_RGBA_ARB                       0x202B
 
+// TODO(Abdo): Move this to renderer file eventually
+struct Transform
+{
+    hmm_mat4 Translation;
+    hmm_mat4 Rotation;
+    hmm_mat4 Scale;
+};
+
 struct OpenGL_Quad_Vertex
 {
     hmm_v3 Position;
@@ -73,6 +81,7 @@ struct OpenGL_Batch_State
     hmm_mat4 projection;
     hmm_mat4 view;
     hmm_mat4 transform;
+    hmm_mat4 camera_transform;
 
     i32 max_texture_slot_count;
     u32 max_quad_count;

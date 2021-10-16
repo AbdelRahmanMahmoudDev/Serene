@@ -263,14 +263,24 @@ OpenGLInitRenderer(GameRendererDimensions *renderer_dimensions, OpenGL_Batch_Sta
     }
 
 
+#if 1
     batch_state->projection = HMM_Orthographic(((f32)renderer_dimensions->ScreenWidth / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenWidth / 2.0f,
 	                                          ((f32)renderer_dimensions->ScreenHeight / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenHeight / 2.0f,
 										       -1.0f, 1.0f);
 
 	batch_state->view = HMM_Translate({0.0f, 0.0f, -1.0f});	
+
+    batch_state->camera_transform = batch_state->projection * batch_state->view;
+#else 
+    batch_state->projection = HMM_Perspective(45.0f,
+                                              (f32)renderer_dimensions->ScreenWidth / (f32)renderer_dimensions->ScreenHeight,
+                                              0.1f, 100.0f);
+
+    batch_state->view = HMM_Translate({0.0f, 0.0f, 0.1f});
+#endif
+
     glUseProgram(batch_state->shader_program);
-    OpenGLSetMat4(batch_state->shader_program, "u_Projection", batch_state->projection);
-    OpenGLSetMat4(batch_state->shader_program, "u_View", batch_state->view);
+    OpenGLSetMat4(batch_state->shader_program, "u_ProjectionView", batch_state->camera_transform);
     OpenGLSetu32Array(batch_state->shader_program, "u_TextureSlots", batch_state->max_texture_slot_count, batch_state->texture_sampler_base);
 
 	glGenVertexArrays(1, &batch_state->vertex_array_object);

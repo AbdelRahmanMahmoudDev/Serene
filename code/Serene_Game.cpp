@@ -117,7 +117,13 @@ extern "C" GAME_UPDATE(GameUpdate)
 
 		InitializeArena(&State->RendererArena,
 		                MEGABYTES(500),
-						(u8 *)Memory->PermanentStorage + sizeof(GameState) + MEGABYTES(10));						
+						(u8 *)Memory->PermanentStorage + sizeof(GameState) + MEGABYTES(10));
+
+		InitializeArena(&State->PhysicsArena,
+		                MEGABYTES(500),
+						(u8 *)Memory->PermanentStorage + sizeof(GameState) + MEGABYTES(10) + MEGABYTES(500));			
+
+		// GamePhysics *physics_mem_base = PushStruct(State->PhysicsArena, GamePhysics);			
 
 		State->world = PushStruct(&State->WorldArena, World);
 		World *world = State->world;
@@ -153,65 +159,59 @@ extern "C" GAME_UPDATE(GameUpdate)
 		State->PlayerPos.TileRelativePos.X = 5.0f;
 		State->PlayerPos.TileRelativePos.Y = 5.0f;
 
-		for (i32 Y = 0;
-			Y < 256;
-			++Y)
-			{
-				for(i32 X = 0;
-				    X < 256;
-					++X)
-					{
-						i32 value = 0;
-						if(test_level_layout[Y][X] > 0)
-						{
-							value = test_level_layout[Y][X] == 1 ? 1 : 2;
-						}
-
-						SetTile(State->WorldArena, tile_map, X, Y, value);
-					}
-			}
-
 		Memory->IsInitialized = true;
 	}
-	World *world = State->world;
-	TileMap *tile_map = world->Tiles;
 
-	f32 PlayerR = 0.3f;
-	f32 PlayerG = 0.5f;
-	f32 PlayerB = 0.2f;
-	f32 PlayerHeight = 1.4f;
-	f32 PlayerWidth = 0.75f * PlayerHeight;
     
+	local_persist f32 go_up = 1.0f;
+	local_persist f32 go_left = 1.0f;
+	
+	char buffer[512];
+	sprintf_s(buffer, sizeof(buffer), "go_up: %f, go_left: %f\n", go_up, go_left);
+	OutputDebugStringA(buffer);
+
 	//Input
-	for(u32 ControllerIndex = 0; ControllerIndex < ArrayCount(Input->Controllers); ++ControllerIndex)
+	for(u32 ControllerIndex = 0; ControllerIndex < 1; ++ControllerIndex)
 	{
-		GameController* Controller0 = &Input->Controllers[ControllerIndex];
+		GameController* Controller0 = &Input->Controllers[0];
 		if(Controller0->IsAnalog)
 		{
-			//Analog processing
+			// Analog processing
 		}
 		else
 		{
-			//Digital processing
+			// Digital processing
             hmm_v2 PlayerAcceleration = {};
 			if(Controller0->DPadUp.EndedPress)
 			{
-				PlayerAcceleration.Y = 1.0f;
+				go_up-=25.0f;
+				State->opengl_batch.view = HMM_Translate({go_left, go_up, 0.0f});
+				State->opengl_batch.camera_transform = State->opengl_batch.projection * State->opengl_batch.view;
+				OpenGLSetMat4(State->opengl_batch.shader_program, "u_ProjectionView", State->opengl_batch.camera_transform);
 			}
             
 			if(Controller0->DPadDown.EndedPress)
 			{
-				PlayerAcceleration.Y = -1.0f;
+				go_up+=25.0f;
+				State->opengl_batch.view = HMM_Translate({go_left, go_up, 0.0f});
+				State->opengl_batch.camera_transform = State->opengl_batch.projection * State->opengl_batch.view;
+				OpenGLSetMat4(State->opengl_batch.shader_program, "u_ProjectionView", State->opengl_batch.camera_transform);
 			}
             
 			if(Controller0->DPadLeft.EndedPress)
 			{
-				PlayerAcceleration.X = -1.0f;
+				go_left+=25.0f;
+				State->opengl_batch.view = HMM_Translate({go_left, go_up, 0.0f});
+				State->opengl_batch.camera_transform = State->opengl_batch.projection * State->opengl_batch.view;
+				OpenGLSetMat4(State->opengl_batch.shader_program, "u_ProjectionView", State->opengl_batch.camera_transform);
 			}
             
 			if(Controller0->DPadRight.EndedPress)
 			{
-				PlayerAcceleration.X = 1.0f;
+				go_left-=25.0f;
+				State->opengl_batch.view = HMM_Translate({go_left, go_up, 0.0f});
+				State->opengl_batch.camera_transform = State->opengl_batch.projection * State->opengl_batch.view;
+				OpenGLSetMat4(State->opengl_batch.shader_program, "u_ProjectionView", State->opengl_batch.camera_transform);
 			}
 			PlayerAcceleration *= 4.0f;
 			// Poor man's friction

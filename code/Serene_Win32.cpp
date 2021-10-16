@@ -828,8 +828,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 
 		Memory.DebugPlatformReadEntireFile = DebugPlatformReadEntireFile;
 		Memory.DebugPlatformWriteEntireFile = DebugPlatformWriteEntireFile;
-		Memory.PermanentStorageSize = MEGABYTES(700);
-		Memory.TransientStorageSize = GIGABYTES(1);
+		Memory.PermanentStorageSize = GIGABYTES(2);
+		Memory.TransientStorageSize = GIGABYTES(2);
 		Win32_State.TotalSize = Memory.TransientStorageSize + Memory.PermanentStorageSize;
 
 		Win32_State.GameMemoryBlock = VirtualAlloc(BaseAddress, Win32_State.TotalSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);

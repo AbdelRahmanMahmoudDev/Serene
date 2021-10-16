@@ -5,6 +5,9 @@
 #include "Serene_Tiles.h"
 #include "Serene_OpenGL.h"
 
+#include "3rd_Party/box2d/include/box2d/b2_world.h"
+#include "3rd_Party/box2d/include/box2d/b2_math.h"
+
 struct MemoryArena
 {
 	u8 *Base;
@@ -40,6 +43,16 @@ struct WorldPosition
 	hmm_v2 TileRelativePos;
 };
 
+// this might be temporary as an easy way to persist between frames
+#if 0
+struct GamePhysics
+{
+	b2World *physics_world;
+	b2BodyDef ground_body_definition;
+	b2Body *ground_body;
+	b2PolygonShape ground_polygon;
+};
+#endif 
 
 struct GameState
 {
@@ -49,6 +62,7 @@ struct GameState
 
 	MemoryArena WorldArena;
 	MemoryArena RendererArena;
+	MemoryArena PhysicsArena;
 
 	u32 shader_program;
 
