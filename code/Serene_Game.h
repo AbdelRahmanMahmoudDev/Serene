@@ -2,11 +2,8 @@
 
 #include "Serene_Core.h"
 #include "3rd_Party/Handmade-Math/HandmadeMath.h"
-#include "Serene_Tiles.h"
+// #include "Serene_Tiles.h"
 #include "Serene_OpenGL.h"
-
-#include "3rd_Party/box2d/include/box2d/b2_world.h"
-#include "3rd_Party/box2d/include/box2d/b2_math.h"
 
 struct MemoryArena
 {
@@ -15,9 +12,38 @@ struct MemoryArena
 	MemoryIndex Used;
 };
 
+// Each entity would have an AABB?
+// Note (Abdo): Think about this more
+struct AxisAlignedBoundingBox
+{
+	hmm_v3 CenterPoint;
+	f32 WidthHalfLength;
+	f32 HeightHalfLength;
+};
+
+struct Entity
+{
+	// These 2 give the overall span of the entity, used in the renderer
+	hmm_v3 bottom_left_corner;
+	hmm_v3 dimensions;
+    
+	// These define the axis aligned bounding box
+	hmm_v3 CenterPoint;
+	f32 WidthHalfLength;
+	f32 HeightHalfLength;
+	hmm_v3 HalfExtents;
+    
+	b32 IsExistant;
+};
+
+struct TileMap
+{
+	u32 *Tile_Data;
+};
+
 struct World
 {
-	TileMap *Tiles;
+	TileMap *TileMaps;
 };
 
 struct BMPAsset
@@ -37,42 +63,41 @@ struct PNGAsset
 
 struct WorldPosition
 {
+    // Position in a tileset
 	i32 TileX;
 	i32 TileY;
-
+    
+    // Position inside a tile
+    // This allows great precision and therefore
+    // smooth movement
 	hmm_v2 TileRelativePos;
 };
 
-// this might be temporary as an easy way to persist between frames
-#if 0
-struct GamePhysics
-{
-	b2World *physics_world;
-	b2BodyDef ground_body_definition;
-	b2Body *ground_body;
-	b2PolygonShape ground_polygon;
-};
-#endif 
-
 struct GameState
 {
-	WorldPosition PlayerPos;
+	// Player stuff
+	hmm_v3 PlayerPosition;
+    
+	// Ignore these for now
 	hmm_v2 PlayerVelocity;
 	World *world;
-
+	TileMap *TileMap;
+    
+	//Entities
+	Entity EntityList[10];
+    
 	MemoryArena WorldArena;
 	MemoryArena RendererArena;
-	MemoryArena PhysicsArena;
-
+    
 	u32 shader_program;
-
+    
 	PNGAsset Grass;
 	PNGAsset Mud;
-
+    
 	OpenGL_Batch_State opengl_batch;
 	// TODO(Abdo): Move these to some kind o OpenGL Texture struct
-	u32 texture_0;
-	u32 texture_1;
+	u32 texture_Grass;
+	u32 texture_Mud;
 };
 
 #define SERENE_GAME_H

@@ -146,6 +146,7 @@ OpenGLCreateTexture(PNGAsset *image)
     {
         // image loaded incorrectly
         // TODO(Abdo): Logging
+        texture_id = 0;
     }
 
     return texture_id;
@@ -264,8 +265,8 @@ OpenGLInitRenderer(GameRendererDimensions *renderer_dimensions, OpenGL_Batch_Sta
 
 
 #if 1
-    batch_state->projection = HMM_Orthographic(((f32)renderer_dimensions->ScreenWidth / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenWidth / 2.0f,
-	                                          ((f32)renderer_dimensions->ScreenHeight / 2.0f) * -1.0f, (f32)renderer_dimensions->ScreenHeight / 2.0f,
+    batch_state->projection = HMM_Orthographic(0.0f, (f32)renderer_dimensions->ScreenWidth,
+	                                           0.0f, (f32)renderer_dimensions->ScreenHeight,
 										       -1.0f, 1.0f);
 
 	batch_state->view = HMM_Translate({0.0f, 0.0f, -1.0f});	
@@ -320,7 +321,7 @@ OpenGLInitRenderer(GameRendererDimensions *renderer_dimensions, OpenGL_Batch_Sta
 // advances vertex data pointer
 // uploads vertices and issues draw call ONLY if max index count reached
 internal void
-OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, hmm_v2 dimensions, hmm_v4 color)
+OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, hmm_v3 dimensions, hmm_v4 color)
 {
     if(batch_state->current_index_count >= batch_state->max_index_count)
     {
@@ -380,7 +381,7 @@ OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, h
 // uploads texture to OpenGL
 // uploads vertices and issues draw call ONLY if max index count reached OR max texture slot reached
 internal void
-OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, f32 size, u32 texture_id)
+OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, hmm_v3 dimensions, u32 texture_id)
 {
     if(batch_state->current_index_count >= batch_state->max_index_count ||
        batch_state->texture_slot_index > (u32)(batch_state->max_texture_slot_count - 1))
@@ -432,19 +433,19 @@ OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corne
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + size, bottom_left_corner.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 0.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + size, bottom_left_corner.Y + size, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y + size, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {0.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;

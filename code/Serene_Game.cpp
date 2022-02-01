@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "Serene_Game.h"
 #include "Serene_Platform.h"
 #include "Serene_Intrinsics.h"
@@ -17,7 +19,7 @@
 extern "C" GAME_GENERATE_AUDIO(GameGenerateAudio)
 {
     i16 amplitude = 32760;
-	f32 frequency = 441.0f;
+    f32 frequency = 441.0f;
 	double t = (2 * Pi * frequency) / (SoundOutput->SamplesPerSecond * SoundOutput->NumberOfChannels); // wave phase
 	for(i32 sampleIndex = 0; sampleIndex < SoundOutput->SoundBufferSize; ++sampleIndex)
 	{
@@ -30,10 +32,6 @@ extern "C" GAME_GENERATE_AUDIO(GameGenerateAudio)
 	}
 }
 
-
-
-#include "Serene_Tiles.cpp"
-
 // TODO(Abdo): collapse this into another function in the asset system
 internal void
 ConstructAssetDirectory(char *desired_path, char *asset_path, char *resource_path)
@@ -42,37 +40,105 @@ ConstructAssetDirectory(char *desired_path, char *asset_path, char *resource_pat
 	strcat(desired_path, resource_path);
 }
 
+// world stuff
+
+#define PIXELS_PER_METER 80
+
+internal f32 
+MetersToPixels(f32 value_in_meters)
+{
+	f32 Result = value_in_meters * PIXELS_PER_METER;
+	return(Result);
+}
+
+internal hmm_vec3 
+MetersToPixels(hmm_vec3 vec3_in_meters)
+{
+	hmm_vec3 Result = {};
+	Result.X = vec3_in_meters.X * PIXELS_PER_METER;
+	Result.Y = vec3_in_meters.Y * PIXELS_PER_METER;
+	Result.Z = vec3_in_meters.Z * PIXELS_PER_METER;
+	return(Result);
+}
+
+internal f32
+PixelsToMeters(f32 value_in_pixels)
+{
+	f32 Result = value_in_pixels / PIXELS_PER_METER;
+	return(Result);
+}
+
+internal hmm_vec3
+PixelsToMeters(hmm_vec3 vec3_in_pixels)
+{
+	hmm_vec3 Result = {};
+	Result.X = vec3_in_pixels.X / PIXELS_PER_METER;
+	Result.Y = vec3_in_pixels.Y / PIXELS_PER_METER;
+	Result.Z = vec3_in_pixels.Z / PIXELS_PER_METER;
+	return(Result);
+}
+
+#define TILE_DIMM PIXELS_PER_METER
+#define TILE_COUNT_X 16
+#define TILE_COUNT_Y 9
+
+global u32 TileMap01[TILE_COUNT_Y][TILE_COUNT_X]
+{
+	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0}
+};
+
+global u32 TileMap02[TILE_COUNT_Y][TILE_COUNT_X]
+{
+	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1},
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0}
+};
+
+internal b32
+IsPointEmpty(hmm_vec3 point, u32 *tiles)
+{
+	b32 Result = false;
+    u32 player_tile_map_position_x = (u32)(point.X / TILE_DIMM);
+    u32 player_tile_map_position_y = (u32)(point.Y / TILE_DIMM);
+    
+    if((player_tile_map_position_x >= 0 && player_tile_map_position_x <= TILE_COUNT_X) &&
+       (player_tile_map_position_y >= 0 && player_tile_map_position_y <= TILE_COUNT_Y))
+    {
+        if(tiles[player_tile_map_position_y * TILE_COUNT_X + player_tile_map_position_x] == 1)
+        {
+            Result = true;
+        }
+    }
+	return(Result);
+}
+
+internal b32
+IsPointEmpty(World *world, hmm_vec3 point)
+{
+    
+}
+
 extern "C" GAME_UPDATE(GameUpdate)
 {
-	// 9 rows, 16 columns
-	local_persist u32 test_level_layout[256][256] = 
-	{
-        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
-        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 1},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2,  2, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, 2},
-        {2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2,  2, 2, 2, 2,  2, 2, 2, 2,  1, 2, 2, 2,  2, 2, 2, 2, 2},
-	};
-
-
 	// Memory
 	Assert(sizeof(GameState) <= Memory->PermanentStorageSize);
 	GameState* State = (GameState*)Memory->PermanentStorage;
 	if(!Memory->IsInitialized)
-	{
+	{	
 		// We need to load all driver functions into the game dll
 		// IMPORTANT(Abdo): This only applies to the OpenGL Renderer
 		// TODO(Abdo): Do this somewhere more sensible!!
@@ -88,89 +154,96 @@ extern "C" GAME_UPDATE(GameUpdate)
 		// TODO(Abdo): Asset system!!!!
 		char vertex_shader_path[MAX_PATH];
 		ConstructAssetDirectory(vertex_shader_path, asset_path->AssetPath, "/Shaders/BasicFill.vert");
-
+        
 		char fragment_shader_path[MAX_PATH];
 		ConstructAssetDirectory(fragment_shader_path, asset_path->AssetPath, "/Shaders/BasicFill.frag");
-
+        
         State->opengl_batch.shader_program = OpenGLLoadShaders(Memory->DebugPlatformReadEntireFile, vertex_shader_path, fragment_shader_path, &thread);
-
+        
 		stbi_set_flip_vertically_on_load(1);
-		
+        
+        
+		char mud_path[MAX_PATH];
+		ConstructAssetDirectory(mud_path, asset_path->AssetPath, "/assets/Textures/Mud.png");
+		State->Mud = {};
+		State->Mud.Data = stbi_load(mud_path, &State->Mud.Width, &State->Mud.Height, &State->Mud.Channel_Count, 0);
+		State->texture_Mud = OpenGLCreateTexture(&State->Mud);
+        
 		//stb uses malloc and delete
 		// TODO(Abdo): make stb use our asset allocater;
 		char grass_path[MAX_PATH];
 		ConstructAssetDirectory(grass_path, asset_path->AssetPath, "/assets/textures/Grass.png");
 		State->Grass = {};
 		State->Grass.Data = stbi_load(grass_path, &State->Grass.Width, &State->Grass.Height, &State->Grass.Channel_Count, 0);
-		State->texture_0 = OpenGLCreateTexture(&State->Grass);
-
-		char mud_path[MAX_PATH];
-		ConstructAssetDirectory(mud_path, asset_path->AssetPath, "/assets/Textures/Mud.png");
-		State->Mud = {};
-		State->Mud.Data = stbi_load(mud_path, &State->Mud.Width, &State->Mud.Height, &State->Mud.Channel_Count, 0);
-		State->texture_1 = OpenGLCreateTexture(&State->Mud);
-
+		State->texture_Grass = OpenGLCreateTexture(&State->Grass);
+        
+		// Figure out size of 1 level
+		// This won't work at multiple resolutions / fullscreen
+		// Create meter units first
+		u32 level_size_in_bytes = renderer_dimensions->ScreenHeight * renderer_dimensions->ScreenHeight * sizeof(f32);
+        
 		// Setting up memory arenas
 		InitializeArena(&State->WorldArena,
-					 	MEGABYTES(10),
+                        Memory->PermanentStorageSize - sizeof(GameState) - MEGABYTES(500),
 						(u8 *)Memory->PermanentStorage + sizeof(GameState));
-
+        
 		InitializeArena(&State->RendererArena,
 		                MEGABYTES(500),
-						(u8 *)Memory->PermanentStorage + sizeof(GameState) + MEGABYTES(10));
-
-		InitializeArena(&State->PhysicsArena,
-		                MEGABYTES(500),
-						(u8 *)Memory->PermanentStorage + sizeof(GameState) + MEGABYTES(10) + MEGABYTES(500));			
-
-		// GamePhysics *physics_mem_base = PushStruct(State->PhysicsArena, GamePhysics);			
-
-		State->world = PushStruct(&State->WorldArena, World);
-		World *world = State->world;
-		world->Tiles = PushStruct(&State->WorldArena, TileMap);
-		TileMap *tile_map = world->Tiles;
+						(u8 *)Memory->PermanentStorage + sizeof(GameState) + level_size_in_bytes);
 		
 		u32 max_quad_count = 1000;
 		OpenGLInitRenderer(renderer_dimensions, &State->opengl_batch, &State->RendererArena, max_quad_count);
-
-		// NOTE(Abdo): This tile map struct is outdated!!
-		// TODO(Abdo): Reconstruct this to fit new world structure
-		tile_map->ChunkShift = 8;
-		tile_map->ChunkMask = (1 << tile_map->ChunkShift) - 1;
-		tile_map->ChunkDimm = 1 << tile_map->ChunkShift;
-		tile_map->ChunkCountX = 32;
-		tile_map->ChunkCountY = 32;
-		tile_map->TileChunks = PushArray(&State->WorldArena, tile_map->ChunkCountX * tile_map->ChunkCountY, TileChunk);
-
-		tile_map->TileWidthInMeters = 1.4f;
-		tile_map->TileWidthInPixels = 60;
-		tile_map->MetersToPixels = (f32)tile_map->TileWidthInPixels / (f32)tile_map->TileWidthInMeters;
-
-		// The origin of the world is designed to be at the bottom left
-		// This means the x origin remains the same
-		// But the y origin must be moved from the top left to the bottom left
-		// the bottom left is the top left offset by the bitmap height
-		// This is because the OS creates a buffer that starts at the top left 
-		tile_map->Origin = {0.0f, 0.0f};
-
+        
 		// State
-		State->PlayerPos.TileX = 3;
-		State->PlayerPos.TileY = 3;
-		State->PlayerPos.TileRelativePos.X = 5.0f;
-		State->PlayerPos.TileRelativePos.Y = 5.0f;
-
+		// Player stuff
+		// TODO: (Abdo) Give a spawn position in meters
+		State->PlayerPosition = {1.0f, 1.0f, 0.0f};
+        
+        
+        
+		// Clear Entity list
+		for(u32 entity_index = 0; entity_index < 10; ++entity_index)
+		{
+			State->EntityList[entity_index] = {};
+			State->EntityList[entity_index].IsExistant = false;
+		}
+        
+		// Add entities
+		// TODO: (Abdo) Entity grouping!!!!
+		// TODO: (Abdo) Change entity bottom_left_corner to centre, this requires changes in rendering code
+		// TODO: (Abdo) Finish transitioning to meters 
+		Entity flat_entity = {};
+		flat_entity.bottom_left_corner = {2.0f , 2.0f, 0.0f};
+		flat_entity.dimensions = {5.0f, 5.0f, 0.0f};
+		flat_entity.IsExistant = true;
+		State->EntityList[0] = flat_entity;
+        
+		Entity textured_entity = {};
+		textured_entity.bottom_left_corner = {4.0f, 4.0f, 0.0f};
+		textured_entity.dimensions = {1.0f, 1.0f, 0.0f};
+		textured_entity.IsExistant = true;
+		State->EntityList[1] = textured_entity;
+        
+		Entity player_entity = {};
+		player_entity.bottom_left_corner = State->PlayerPosition;
+		player_entity.dimensions = {1.0f, 1.5f, 0.0f};
+		player_entity.IsExistant = true;
+		State->EntityList[2] = player_entity;
+        
 		Memory->IsInitialized = true;
 	}
-
     
+    World world = {};
+    TileMap tile_maps[2];
+    tile_maps[0].Tile_Data = *TileMap01;
+    tile_maps[1].Tile_Data = *TileMap02;
+    world.TileMaps = tile_maps;
+    
+    // Camera controls
 	local_persist f32 go_up = 1.0f;
 	local_persist f32 go_left = 1.0f;
-	
-	char buffer[512];
-	sprintf_s(buffer, sizeof(buffer), "go_up: %f, go_left: %f\n", go_up, go_left);
-	OutputDebugStringA(buffer);
-
-	//Input
+    
+	// Input
 	for(u32 ControllerIndex = 0; ControllerIndex < 1; ++ControllerIndex)
 	{
 		GameController* Controller0 = &Input->Controllers[0];
@@ -180,8 +253,8 @@ extern "C" GAME_UPDATE(GameUpdate)
 		}
 		else
 		{
+#if CAMERA_PATH
 			// Digital processing
-            hmm_v2 PlayerAcceleration = {};
 			if(Controller0->DPadUp.EndedPress)
 			{
 				go_up-=25.0f;
@@ -213,9 +286,51 @@ extern "C" GAME_UPDATE(GameUpdate)
 				State->opengl_batch.camera_transform = State->opengl_batch.projection * State->opengl_batch.view;
 				OpenGLSetMat4(State->opengl_batch.shader_program, "u_ProjectionView", State->opengl_batch.camera_transform);
 			}
-			PlayerAcceleration *= 4.0f;
-			// Poor man's friction
-			PlayerAcceleration += -0.9f * State->PlayerVelocity;
+#else
+			// Digital processing
+			// Player movement code
+			f32 velocity = 7.5f;
+			hmm_v3 new_pos = MetersToPixels(State->PlayerPosition);
+			if(Controller0->DPadUp.EndedPress)
+			{
+				new_pos.Y += velocity;
+			}
+            
+			if(Controller0->DPadDown.EndedPress)
+			{
+				new_pos.Y -= velocity;
+			}
+            
+			if(Controller0->DPadLeft.EndedPress)
+			{
+				new_pos.X -= velocity;
+			}
+            
+			if(Controller0->DPadRight.EndedPress)
+			{
+				new_pos.X += velocity;
+			}		
+            
+			// TODO: (Abdo) Collision detection
+			// TODO: (Abdo) Check collisions in meters, not pixels
+			u32 *tiles_ptr = *TileMap01;
+            
+            
+            
+			hmm_vec3 player_position_in_pixels = MetersToPixels(State->PlayerPosition);
+			hmm_v3 player_bottom_left = player_position_in_pixels;
+			hmm_v3 player_bottom_right = {player_position_in_pixels.X + TILE_DIMM, player_position_in_pixels.Y, 0.0f};
+			if(IsPointEmpty(player_bottom_left, world.TileMaps[0].Tile_Data) &&
+			   IsPointEmpty(player_bottom_right, world.TileMaps[0].Tile_Data))
+            {
+                // move accepted
+                State->PlayerPosition =  PixelsToMeters(new_pos);
+            }	
+            else 
+            {
+                State->PlayerPosition = PixelsToMeters({80.0f, 80.0f, 0.0f});
+            }	
+#endif
 		}
 	}
     
@@ -226,45 +341,57 @@ extern "C" GAME_UPDATE(GameUpdate)
 		GameGenerateAudio(&thread, SoundOutput);
 		SoundOutput->IsBufferFilled = true;
 	}
-
+    
+	// Collision loop
+	// We need data about where stuff exists within a level
+	for(u32 entity_index = 0; entity_index < 10; ++entity_index)
+	{
+		Entity entity = State->EntityList[entity_index];
+		if(entity.IsExistant)
+		{
+			// Check stuff
+		}
+	}
+    
 	// Render 
 	glClear(GL_COLOR_BUFFER_BIT);
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-
-	f32 tile_dimms = 60.0f;
-	i32 column_count = CeilFloat((f32)renderer_dimensions->ScreenWidth / tile_dimms);
-	i32 row_count = CeilFloat((f32)renderer_dimensions->ScreenHeight / tile_dimms);
-
-	hmm_v2 origin = {0.0f, 0.0f};
-
+    
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-	// Maybe the OpenGL batch state should be defined only once??
-	OpenGLPushFlatQuad(&State->opengl_batch, {0.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {1.0f, 0.0f, 0.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {125.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {0.0f, 1.0f, 0.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {-125.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {0.0f, 0.0f, 1.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {250.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {1.0f, 1.0f, 0.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {-250.0f , 0.0f, 0.0f}, {100.0f, 100.0f}, {1.0f, 0.0f, 1.0f, 1.0f});
-	OpenGLPushFlatQuad(&State->opengl_batch, {-400.0f , -350.0f, 0.0f}, {500.0f, 100.0f}, {0.0f, 1.0f, 1.0f, 1.0f});
-
-	OpenGLPushTexturedQuad(&State->opengl_batch, {125.0f, -200.0f, 0.0f}, 100.0f, State->texture_0);
-	OpenGLPushTexturedQuad(&State->opengl_batch, {-125.0f, -200.0f, 0.0f}, 100.0f, State->texture_1);
+    
+	// Drawing a tile map
+	// TODO: (Abdo) do pixel conversions on renderer side
+	f32 scale = PIXELS_PER_METER;
+	for(u32 tile_index_y = 0;
+		tile_index_y < 9;
+		++tile_index_y)
+    {
+        for(u32 tile_index_x = 0;
+            tile_index_x < 16;
+            ++tile_index_x)
+        {
+            if(world.TileMaps[0].Tile_Data[TILE_COUNT_X * tile_index_y + tile_index_x] == 1)
+            {
+                OpenGLPushTexturedQuad(&State->opengl_batch, {(f32)(tile_index_x * scale), (f32)(tile_index_y * scale), 0.0f}, {scale, scale}, State->texture_Mud);
+            }
+            else
+            {
+                OpenGLPushTexturedQuad(&State->opengl_batch, {(f32)(tile_index_x * scale), (f32)(tile_index_y * scale), 0.0f}, {scale, scale}, State->texture_Grass);
+            }
+        }
+    }
+    
+	// Can passing the opengl_batch_state ever time be avoided?
+    
+	// Draw player
+#if	0
+	OpenGLPushTexturedQuad(&State->opengl_batch, State->EntityList[2].bottom_left_corner + State->PlayerPosition,
+                           State->EntityList[2].dimensions, State->texture_Mud);
+#else
+	OpenGLPushFlatQuad(&State->opengl_batch, MetersToPixels(State->PlayerPosition),
+                       {scale, scale}, {0.5f, 0.0f, 0.5f, 1.0f});
+#endif	
+    
 	OpenGLFlush(&State->opengl_batch);
-	
-#if 0
-	// Draws a grid of quads
-	// TODO(Abdo): Pull this out into a function that can easily sample from a texture atlas and draw basic levels
-	for (f32 y = -360.0f;
-		y < 360.0f;
-		y += 100.0f)
-	{
-		for(f32 x = -640.0f;
-		   x < 640.0f;
-		   x += 100.0f)
-		{
-			buffer = OpenGLCreateQuad(buffer, {x, y, 0.0f}, 100.0f, {1.0f, 0.0f, 0.0f, 1.0f}, 0.0f);
-			index_count += 6;
-		}
-	}
-#endif
+    
 }

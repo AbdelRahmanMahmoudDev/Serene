@@ -1,0 +1,3 @@
+[submodule "code/3rd_Party/submodules/box2d"]
+	path = code/3rd_Party/submodules/box2d
+	url = https://github.com/AbdelRahmanMahmoudDev/box2d.git
