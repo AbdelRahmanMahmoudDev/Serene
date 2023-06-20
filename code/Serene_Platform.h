@@ -97,13 +97,13 @@ struct ThreadContext
 	i32 Placeholder;
 };
 
-#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) DebugPlatformReadFileResult name(ThreadContext* Thread, char* FileName)
+#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) DebugPlatformReadFileResult name(char* FileName)
 typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platform_read_entire_file);
 
-#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name(ThreadContext* Thread, char* FileName, void* WriteableMemory, u32 MemorySize)
+#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name(char* FileName, void* WriteableMemory, u32 MemorySize)
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
 
-#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(ThreadContext* Thread, void* FreeableMemory)
+#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(void* FreeableMemory)
 typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platform_free_file_memory);
 
 struct GameRendererDimensions
@@ -149,41 +149,8 @@ typedef GAME_GENERATE_AUDIO(game_generate_audio);
 typedef GAME_UPDATE(game_update);
 
 // Note(abdo): These functions were taken from HandmadeHero for educational purposes only
-// they're currently being used in Serene_Win32.cpp 
-// Important(abdo): Use c string functions instead of these
 
 // quick and dirt concatenate strings
-internal void
-CatStrings(i64 SourceACount, char *SourceA,
-		   i64 SourceBCount, char *SourceB,
-		   i64 DestinationCount, char *Destination)
-{
-	for(i32 index = 0; index < SourceACount; ++index)
-	{
-		*Destination++ = *SourceA++;
-	}
-
-	for(i32 index = 0; index < SourceBCount; ++index)
-	{
-		*Destination++ = *SourceB++;
-	}
-
-	//Add null termination
-	*Destination++ = 0;
-}
-
-
-internal i32
-StringLength(char *String)
-{
-	i32 result = 0;
-	while(*String++)
-	{
-		result++;
-	}
-
-	return result;
-}
 
 
 #define SERENE_PLATFORM_H

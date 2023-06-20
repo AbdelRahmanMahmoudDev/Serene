@@ -1,25 +1,21 @@
-#include "Serene_OpenGL.h"
-
-#include "3rd_Party/Handmade-Math/HandmadeMath.h"
-
 /*
 TODO(Abdo):
     -Cache uniforms
     -Is there a way to give the batch shader a custom number of samplers based on driver query?
 */
-
+#if 0
 // Load shader files, parse them and output a shader program
 internal u32 
-OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path, char *fragment_path, ThreadContext *thread)
+OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path, char *fragment_path )
 {
     // Read our shaders into the appropriate buffers
     u32 Result = 0;
 
-    DebugPlatformReadFileResult vertex_code = pRead_File(thread, vertex_path);
-    DebugPlatformReadFileResult fragment_code = pRead_File(thread, fragment_path);
+    DebugPlatformReadFileResult vertex_code = pRead_File(vertex_path);
+    DebugPlatformReadFileResult fragment_code = pRead_File(fragment_path);
 
     // Create an empty vertex shader handle
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    u32 vertexShader = glCreateShader(GL_VERTEX_SHADER);
 
     // Send the vertex shader source code to GL
     // Note that std::string's .c_str is NULL character terminated.
@@ -29,11 +25,11 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
     // Compile the vertex shader
     glCompileShader(vertexShader);
 
-    GLint isCompiled = 0;
+    i32 isCompiled = 0;
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &isCompiled);
     if(isCompiled == GL_FALSE)
     {
-    	GLint maxLength = 2048;
+    	i32 maxLength = 2048;
     	//glGetShaderiv(vertexShader, GL_INFO_LOG_LENGTH, &maxLength);
 
     	// The maxLength includes the NULL character
@@ -51,7 +47,7 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
     }
 
     // Create an empty fragment shader handle
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    u32 fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
 
     // Send the fragment shader source code to GL
     // Note that std::string's .c_str is NULL character terminated.
@@ -64,7 +60,7 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &isCompiled);
     if (isCompiled == GL_FALSE)
     {
-    	GLint maxLength = 2048;
+    	i32 maxLength = 2048;
 
     	// The maxLength includes the NULL character
         char infoLog[2048];
@@ -85,7 +81,7 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
     // Vertex and fragment shaders are successfully compiled.
     // Now time to link them together into a program.
     // Get a program object.
-    GLuint program = glCreateProgram();
+    u32 program = glCreateProgram();
 
     // Attach our shaders to our program
     glAttachShader(program, vertexShader);
@@ -95,11 +91,11 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
     glLinkProgram(program);
     Result = program;
     // Note the different functions here: glGetProgram* instead of glGetShader*.
-    GLint isLinked = 0;
+    i32 isLinked = 0;
     glGetProgramiv(program, GL_LINK_STATUS, (int *)&isLinked);
     if (isLinked == GL_FALSE)
     {
-    	GLint maxLength = 2048;
+    	i32 maxLength = 2048;
 
     	// The maxLength includes the NULL character
         char infoLog[2048];
@@ -121,7 +117,7 @@ OpenGLLoadShaders(debug_platform_read_entire_file *pRead_File, char *vertex_path
     // Always detach shaders after a successful link.
     glDetachShader(program, vertexShader);
     glDetachShader(program, fragmentShader);
-    return Result;
+    return(Result);
 }
 
 internal u32
@@ -165,10 +161,10 @@ OpenGLSetFloat(u32 shader_handle, char *uniform_name, f32 value)
 }
 
 internal void
-OpenGLSetVec2(u32 shader_handle, char *uniform_name, hmm_v2 value) 
+OpenGLSetVec2(u32 shader_handle, char *uniform_name, v2 value) 
 {
     i32 uniform_location = glGetUniformLocation(shader_handle, uniform_name);
-    glUniform2f(uniform_location, value.X, value.Y);
+    glUniform2f(uniform_location, value.x, value.y);
 }
 
 internal void
@@ -187,10 +183,13 @@ OpenGLSetu32Array(u32 shader_handle, char *uniform_name, i32 count , i32 *value)
 }
 
 internal void
-OpenGLSetMat4(u32 shader_handle, char *uniform_name, hmm_m4 matrix)
+OpenGLSetMat4(u32 shader_handle, char *uniform_name, mat4 matrix)
 {
+   /*TODO(ABDO):
+   Finish this by implementing 4x4 matrices
+   */
     i32 unifrom_location = glGetUniformLocation(shader_handle, uniform_name);
-    glUniformMatrix4fv(unifrom_location, 1, GL_FALSE, (f32 *)matrix.Elements);
+    // glUniformMatrix4fv(unifrom_location, 1, GL_FALSE, (f32 *)matrix.Elements);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                    Uniform uploads
@@ -265,13 +264,15 @@ OpenGLInitRenderer(GameRendererDimensions *renderer_dimensions, OpenGL_Batch_Sta
 
 
 #if 1
-    batch_state->projection = HMM_Orthographic(0.0f, (f32)renderer_dimensions->ScreenWidth,
-	                                           0.0f, (f32)renderer_dimensions->ScreenHeight,
-										       -1.0f, 1.0f);
+    batch_state->projection = Orthographic();
 
-	batch_state->view = HMM_Translate({0.0f, 0.0f, -1.0f});	
+	batch_state->view = Translate();	
 
-    batch_state->camera_transform = batch_state->projection * batch_state->view;
+    /*
+    TODO(ABDO):
+    Implement mat4 * mat4
+    */
+    //batch_state->camera_transform = batch_state->projection * batch_state->view;
 #else 
     batch_state->projection = HMM_Perspective(45.0f,
                                               (f32)renderer_dimensions->ScreenWidth / (f32)renderer_dimensions->ScreenHeight,
@@ -321,7 +322,7 @@ OpenGLInitRenderer(GameRendererDimensions *renderer_dimensions, OpenGL_Batch_Sta
 // advances vertex data pointer
 // uploads vertices and issues draw call ONLY if max index count reached
 internal void
-OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, hmm_v3 dimensions, hmm_v4 color)
+OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, v3 bottom_left_corner, v3 dimensions, v4 color)
 {
     if(batch_state->current_index_count >= batch_state->max_index_count)
     {
@@ -334,8 +335,8 @@ OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, h
         glBindVertexArray(batch_state->vertex_array_object);
 	    glUseProgram(batch_state->shader_program);
 
-        // TODO(Abdo): each quad should have it's own transform
-	    batch_state->transform = HMM_Translate({0.0f, 0.0f, 0.0f}) * HMM_Rotate(0.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({1.0f, 1.0f, 1.0f});
+        // TODO(Abdo): Implement math for this!!!
+	    //batch_state->transform = HMM_Translate({0.0f, 0.0f, 0.0f}) * HMM_Rotate(0.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({1.0f, 1.0f, 1.0f});
 
 	    OpenGLSetMat4(batch_state->shader_program, "u_Transform", batch_state->transform);
 
@@ -349,25 +350,25 @@ OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, h
     // white 1x1 texture
     f32 texture_id = 0.0f;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x, bottom_left_corner.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {0.0f, 0.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x + dimensions.x, bottom_left_corner.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 0.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x + dimensions.x, bottom_left_corner.y + dimensions.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x, bottom_left_corner.y + dimensions.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {0.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = texture_id;
@@ -381,7 +382,7 @@ OpenGLPushFlatQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, h
 // uploads texture to OpenGL
 // uploads vertices and issues draw call ONLY if max index count reached OR max texture slot reached
 internal void
-OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corner, hmm_v3 dimensions, u32 texture_id)
+OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, v3 bottom_left_corner, v3 dimensions, u32 texture_id)
 {
     if(batch_state->current_index_count >= batch_state->max_index_count ||
        batch_state->texture_slot_index > (u32)(batch_state->max_texture_slot_count - 1))
@@ -395,8 +396,8 @@ OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corne
         glBindVertexArray(batch_state->vertex_array_object);
 	    glUseProgram(batch_state->shader_program);
 
-        // TODO(Abdo): each quad should have it's own transform
-	    batch_state->transform = HMM_Translate({0.0f, 0.0f, 0.0f}) * HMM_Rotate(0.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({1.0f, 1.0f, 1.0f});
+        // TODO(Abdo): Implement mat4 * mat4
+	    //batch_state->transform = Translate() * Rotate() * Scale();
 
 	    OpenGLSetMat4(batch_state->shader_program, "u_Transform", batch_state->transform);
 
@@ -425,27 +426,27 @@ OpenGLPushTexturedQuad(OpenGL_Batch_State *batch_state, hmm_v3 bottom_left_corne
         test_texture_id = (f32)texture_id;
     }
 
-    hmm_v4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+    v4 color = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x, bottom_left_corner.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {0.0f, 0.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x + dimensions.x, bottom_left_corner.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 0.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X + dimensions.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x + dimensions.x, bottom_left_corner.y + dimensions.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {1.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
     batch_state->vertex_data_ptr++;
 
-    batch_state->vertex_data_ptr->Position = {bottom_left_corner.X, bottom_left_corner.Y + dimensions.Y, 0.0f};
+    batch_state->vertex_data_ptr->Position = {bottom_left_corner.x, bottom_left_corner.y + dimensions.y, 0.0f};
     batch_state->vertex_data_ptr->Color = color;
     batch_state->vertex_data_ptr->TextureCoordinate = {0.0f, 1.0f};
     batch_state->vertex_data_ptr->TextureID = (f32)test_texture_id;
@@ -473,8 +474,8 @@ internal void OpenGLFlush(OpenGL_Batch_State *batch_state)
         glBindTextureUnit(index, batch_state->texture_slot_base[index]);
     }
 
-    // TODO(Abdo): each quad should have it's own transform
-	batch_state->transform = HMM_Translate({0.0f, 0.0f, 0.0f}) * HMM_Rotate(0.0f, {0.0f, 0.0f, 1.0f}) * HMM_Scale({1.0f, 1.0f, 1.0f});
+    // TODO(Abdo): implement mat4 * mat4
+	//batch_state->transform = Translate() * Rotate() * Scale();
 
 	OpenGLSetMat4(batch_state->shader_program, "u_Transform", batch_state->transform);
     OpenGLSetu32Array(batch_state->shader_program, "u_TextureSlots", batch_state->max_texture_slot_count, batch_state->texture_sampler_base);
@@ -489,3 +490,4 @@ internal void OpenGLFlush(OpenGL_Batch_State *batch_state)
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                    Batch renderer routines
 ////////////////////////////////////////////////////////////////////////////////////////////
+#endif

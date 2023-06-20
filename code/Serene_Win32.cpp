@@ -1,6 +1,7 @@
 
 #include "Serene_Core.h"
 #include "Serene_Platform.h"
+#include "Serene_String.h"
 #include "Serene_Game.h"
 
 #include <Windows.h>
@@ -21,8 +22,7 @@ global b32 Win32WasAltKeyDown;
 global b32 Win32WasKeyDown;
 global b32 Win32IsKeyDown;
 global LARGE_INTEGER PerfFrequency;
-
-
+global Win32WindowData window_data = {};
 
 typedef HGLRC WINAPI wglCreateContextAttribsARBPtr(HDC hdc, HGLRC hShareContext, const int* attribList);
 wglCreateContextAttribsARBPtr* wglCreateContextAttribsARB;
@@ -323,11 +323,7 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DebugPlatformReadEntireFile)
 				{
 					//ReadFile Failed
 					ThreadContext thread = {};
-					DebugPlatformFreeFileMemory(&thread, Result.Content);
-                    
-                    
-                    
-                    
+					DebugPlatformFreeFileMemory(Result.Content);
 					Result.Content = 0;
 				}
 			}
@@ -477,6 +473,8 @@ Win32ToggleFullscreen(HWND hwnd)
                          mi.rcMonitor.right - mi.rcMonitor.left,
                          mi.rcMonitor.bottom - mi.rcMonitor.top,
                          SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+			window_data.Width = mi.rcMonitor.right - mi.rcMonitor.left;
+			window_data.Height = mi.rcMonitor.bottom - mi.rcMonitor.top;
         }
     }
     else
@@ -488,6 +486,7 @@ Win32ToggleFullscreen(HWND hwnd)
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                      SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
+
 }	
 
 internal void
@@ -770,7 +769,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	DrawableRect.right = 1280;
 	DrawableRect.bottom = 720;
     
-	Win32WindowData window_data = {};
+	
 	window_data.Width = DrawableRect.right;
 	window_data.Height = DrawableRect.bottom;
     
@@ -794,7 +793,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	opengl_render_context.MajorVersion = 4;
 	opengl_render_context.MinorVersion = 6;
 	Win32InitOpenGL(&opengl_render_context);
-	wglSwapIntervalEXT(0);
+	wglSwapIntervalEXT(1);
     
 	if (WindowHandle)
 	{
@@ -840,7 +839,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		Assert(Memory.PermanentStorage && Memory.TransientStorage);
         
 		// Allocate audio memory
-		// TODO(abdo): This should be pooled with other disk i/o
+		// TODO(abdo): This should removed when working on disk i/o
 		Win32Sound.SoundData = (u8*)VirtualAlloc(0, Win32Sound.SoundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 		Assert(Win32Sound.SoundData);
         
@@ -857,8 +856,6 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
         Win32Sound.Win32SourceVoice->Start();
         
 		GameRendererDimensions game_renderer_dimensions = {};
-		game_renderer_dimensions.ScreenWidth = window_data.Width;
-		game_renderer_dimensions.ScreenHeight = window_data.Height;
         
 		//Setup Input
 		GameInput Input[2] = {};
@@ -872,7 +869,9 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		Win32IsRunning = true;
 		while (Win32IsRunning)
 		{
-			NewInput->TargetSecondsPerFrame = TargetSecondsPerFrame;
+			game_renderer_dimensions.ScreenWidth = window_data.Width;
+			game_renderer_dimensions.ScreenHeight = window_data.Height;
+			//NewInput->TargetSecondsPerFrame = TargetSecondsPerFrame;
 			FILETIME SourceDLLWriteTime = Win32GetLastWriteTime(SourceGameDLLFullPath);
 			if(CompareFileTime(&GameCode.LastWriteTime, &SourceDLLWriteTime) != 0)
 			{
@@ -1003,6 +1002,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 			GameInput* temp = NewInput;
 			NewInput = OldInput;
 			OldInput = temp;
+			
             
 			/*
 			Performance Calculation
@@ -1013,38 +1013,39 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 			f64 WorkSecondsElapsed = Win32GetSecondsElapsed(LastCounter, WorkCounter);
             
 			f64 SecondsElapsedForFrame = WorkSecondsElapsed;
-			if(SecondsElapsedForFrame < TargetSecondsPerFrame)
-			{
-				if(IsSleepGranular)
-				{
-					DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
+			// if(SecondsElapsedForFrame < TargetSecondsPerFrame)
+			// {
+			// 	if(IsSleepGranular)
+			// 	{
+			// 		DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
                     
-					if(SleepMS > 0)
-					{
-						Sleep(SleepMS);
-					}
-				}
+			// 		if(SleepMS > 0)
+			// 		{
+			// 			//Sleep(SleepMS);
+			// 		}
+			// 	}
                 
-				while(SecondsElapsedForFrame < TargetSecondsPerFrame)
-				{
-					SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
-				}
-			}
-			else
-			{
-				//Log
-			}
+			// 	while(SecondsElapsedForFrame < TargetSecondsPerFrame)
+			// 	{
+			// 		SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+			// 	}
+			// }
+			// else
+			// {
+			// 	//Log
+			// }
             
 			i64 EndCycleCount = __rdtsc();
 			LARGE_INTEGER EndCounter = Win32GetWallClock();
             
 			f64 MegaCyclesElapsed = ((f64)EndCycleCount - (f64)LastCycleCount) / (1000.0f * 1000.0f);
 			f64 MilliSecondsElapsed = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
+			NewInput->TargetSecondsPerFrame = (f32)MilliSecondsElapsed;
 			f64 FramesPerSecond = 1.0f / Win32GetSecondsElapsed(LastCounter, EndCounter);
             
 			char buffer[512];
 			sprintf_s(buffer, sizeof(buffer), "ms/frame: %.2f	Mc/frame: %.2f	FPS: %.2f\n", MilliSecondsElapsed, MegaCyclesElapsed, FramesPerSecond);
-			OutputDebugStringA(buffer);
+			//OutputDebugStringA(buffer);
             
 			LastCounter = EndCounter;
 			LastCycleCount = EndCycleCount;
