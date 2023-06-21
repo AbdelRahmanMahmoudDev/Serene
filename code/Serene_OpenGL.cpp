@@ -490,4 +490,30 @@ internal void OpenGLFlush(OpenGL_Batch_State *batch_state)
 ////////////////////////////////////////////////////////////////////////////////////////////
 //                                    Batch renderer routines
 ////////////////////////////////////////////////////////////////////////////////////////////
+
+internal void
+OpenGLAddQuad(v2 quad_dim, QuadVertex **vertex_buffer_ptr)
+{
+    // TODO(ABDO): Handle case of full buffer
+    // top right
+	f32 offset = 500.0f;
+    QuadVertex *delta_ptr = *vertex_buffer_ptr;
+    delta_ptr->Position = {quad_dim.x, quad_dim.y, 0.0f};
+    ++delta_ptr;
+    // bottom right
+    delta_ptr->Position = {quad_dim.x, 0.0f, 0.0f};
+    ++delta_ptr;
+    // bottom left
+    delta_ptr->Position = {0.0f, 0.0f, 0.0f};
+    ++delta_ptr;
+    //top left
+    delta_ptr->Position = {0.0f, quad_dim.y, 0.0f};
+    ++delta_ptr;
+    
+    MemoryIndex data_offset = delta_ptr - *vertex_buffer_ptr;
+    *vertex_buffer_ptr += data_offset;
+    
+    // increment indices to be drawn
+    current_index_count += 6;
+}
 #endif

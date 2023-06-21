@@ -114,20 +114,24 @@ global char *player_shader_text = R"(
 	##VERTEX
 	#version 330 core
 	layout (location = 0) in vec3 aPos;
+	layout (location = 1) in vec4 aColor;
 	uniform mat4 uClipView;
 	uniform mat4 uTransform;
+	out vec4 oColor;
 
 	void main()
 	{
+		oColor = aColor;
 		gl_Position = uClipView * uTransform * vec4(aPos.x, aPos.y, aPos.z, 1.0);
 	}
 
 	##FRAGMENT
 	#version 330 core
     out vec4 FragColor;
+	in vec4 oColor;
     void main()
     {
-		FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+		FragColor = oColor;
     }
 )";
 
@@ -159,6 +163,7 @@ struct OpenGLShader
 
 global OpenGLShader player_shader;
 global OpenGLShader static_shader;
+global mat4 clip_view;
 internal void
 OpenGLParseShader(char *shader_source, OpenGLShader *ogl_shader)
 {
@@ -358,7 +363,7 @@ OpenGLCompileShader(OpenGLShader *shader)
 struct QuadVertex
 {
 	v3 Position;
-	mat4 Transform;
+	v4 Color;
 };
 
 global u32 current_index_count = 0;
@@ -371,7 +376,6 @@ global mat4 translation = InitMatrix();
 global mat4 scale = InitMatrix();
 global i32 uniform_location;
 
-global QuadVertex player = {};
 global f32 player_dim = 50.0f;
 global v2 player_pixel_pos = {};
 global v2i player_tile_pos = {};
@@ -379,25 +383,55 @@ global v2i player_tile_pos = {};
 global u32 VBO, VAO, EBO;
 global u32 shaderProgram;
 global u32 player_shader_id;
+global u32 static_shader_id;
 
 global MemoryArena RendererArena;
 
 internal void
-OpenGLAddQuad(v2 quad_dim, QuadVertex **vertex_buffer_ptr)
+OpenGLAddQuad(v2 quad_dim, f32 offset, QuadVertex **vertex_buffer_ptr)
+{
+    // TODO(ABDO): Handle case of full buffer
+    // top right
+    QuadVertex *delta_ptr = *vertex_buffer_ptr;
+    delta_ptr->Position = {quad_dim.x + offset, quad_dim.y + offset, 0.0f};
+    ++delta_ptr;
+    // bottom right
+    delta_ptr->Position = {quad_dim.x + offset, offset, 0.0f};
+    ++delta_ptr;
+    // bottom left
+    delta_ptr->Position = {offset, offset, 0.0f};
+    ++delta_ptr;
+    //top left
+    delta_ptr->Position = {offset, quad_dim.y + offset, 0.0f};
+    ++delta_ptr;
+    
+    MemoryIndex data_offset = delta_ptr - *vertex_buffer_ptr;
+    *vertex_buffer_ptr += data_offset;
+    
+    // increment indices to be drawn
+    current_index_count += 6;
+}
+
+internal void
+OpenGLAddQuad(v2 quad_dim, v4 quad_color, QuadVertex **vertex_buffer_ptr)
 {
     // TODO(ABDO): Handle case of full buffer
     // top right
     QuadVertex *delta_ptr = *vertex_buffer_ptr;
     delta_ptr->Position = {quad_dim.x, quad_dim.y, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     // bottom right
     delta_ptr->Position = {quad_dim.x, 0.0f, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     // bottom left
     delta_ptr->Position = {0.0f, 0.0f, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     //top left
     delta_ptr->Position = {0.0f, quad_dim.y, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     
     MemoryIndex data_offset = delta_ptr - *vertex_buffer_ptr;
@@ -423,8 +457,11 @@ extern "C" GAME_UPDATE(GameUpdate)
 		vertex_buffer_current = vertex_buffer_base;
 		u32 *index_buffer_base = (u32*)vertex_buffer_base + vertex_count;
 		
-        OpenGLAddQuad({player_dim, player_dim}, &vertex_buffer_current);
+        OpenGLAddQuad({player_dim, player_dim}, {1.0f, 0.0f, 0.0f, 1.0f}, &vertex_buffer_current);
+        OpenGLAddQuad({100.0f, 100.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, &vertex_buffer_current);
+		OpenGLAddQuad({200.0f, 50.0f}, 500.0f, &vertex_buffer_current);
 		OpenGLParseShader(player_shader_text, &player_shader);
+		OpenGLParseShader(static_shader_text, &static_shader);
         
 		u32 offset = 0;
 		for(u32 index = 0;
@@ -462,59 +499,62 @@ extern "C" GAME_UPDATE(GameUpdate)
     	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * index_count, index_buffer_base, GL_DYNAMIC_DRAW);
     	glEnableVertexAttribArray(0);
     	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QuadVertex), (void*)OFFSETOF(QuadVertex, Position));
+		glEnableVertexAttribArray(1);
+    	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(QuadVertex), (void*)OFFSETOF(QuadVertex, Color));
         
-		player_shader_id = OpenGLCompileShader(&player_shader);		
+		player_shader_id = OpenGLCompileShader(&player_shader);	
+		static_shader_id = OpenGLCompileShader(&static_shader);	
 		glUseProgram(player_shader_id);
 
 		view_to_clip = Perspective((f32)renderer_dimensions->ScreenWidth, (f32)renderer_dimensions->ScreenHeight, 0.1f, 100.0f);
 		model_to_view = Translate({0.0f, 0.0f, -0.1f});
 		scale = Scale({1.0f, 1.0f, 1.0f});
         
-		mat4 clip_view = model_to_view * view_to_clip;
+		clip_view = model_to_view * view_to_clip;
 		uniform_location = glGetUniformLocation(player_shader_id, "uClipView");
+    	glUniformMatrix4fv(uniform_location, 1, GL_FALSE, (clip_view.m));
+		glUseProgram(static_shader_id);
+		uniform_location = glGetUniformLocation(static_shader_id, "uClipView");
     	glUniformMatrix4fv(uniform_location, 1, GL_FALSE, (clip_view.m));
 
 		Memory->IsInitialized = true;
 	}
     
 	// Input
-	for(u32 ControllerIndex = 0; ControllerIndex < 1; ++ControllerIndex)
+	GameController* Controller0 = &Input->Controllers[0];
+	if(Controller0->IsAnalog)
 	{
-		GameController* Controller0 = &Input->Controllers[0];
-		if(Controller0->IsAnalog)
+		// Analog processing
+	}
+	else
+	{
+		// Digital processing
+		// Player movement code
+		local_persist f32 speed = 1.0f;
+		if(Controller0->DPadUp.EndedPress)
 		{
-			// Analog processing
+			player_pixel_pos.y += speed * Input->TargetSecondsPerFrame;
+			translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
 		}
-		else
+        
+		if(Controller0->DPadDown.EndedPress)
 		{
-			// Digital processing
-			// Player movement code
-			local_persist f32 speed = 1.0f;
-			if(Controller0->DPadUp.EndedPress)
-			{
-				player_pixel_pos.y += speed * Input->TargetSecondsPerFrame;
-				translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
-			}
-            
-			if(Controller0->DPadDown.EndedPress)
-			{
-				player_pixel_pos.y -= speed * Input->TargetSecondsPerFrame;
-				translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
-			}
-            
-			if(Controller0->DPadLeft.EndedPress)
-			{
-				player_pixel_pos.x -= speed * Input->TargetSecondsPerFrame;
-				translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
-			}
-            
-			if(Controller0->DPadRight.EndedPress)
-			{
-				player_pixel_pos.x += speed * Input->TargetSecondsPerFrame;
-				translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
-			}		
-            
+			player_pixel_pos.y -= speed * Input->TargetSecondsPerFrame;
+			translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
 		}
+        
+		if(Controller0->DPadLeft.EndedPress)
+		{
+			player_pixel_pos.x -= speed * Input->TargetSecondsPerFrame;
+			translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
+		}
+        
+		if(Controller0->DPadRight.EndedPress)
+		{
+			player_pixel_pos.x += speed * Input->TargetSecondsPerFrame;
+			translation = Translate({player_pixel_pos.x, player_pixel_pos.y, 0.0f});
+		}		
+        
 	}
     
     // Render 
@@ -525,10 +565,15 @@ extern "C" GAME_UPDATE(GameUpdate)
 	// TODO(Abdo): GUI options for wireframe
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	
+	glUseProgram(player_shader_id);
 	mat4 transform = scale * translation;
 	uniform_location = glGetUniformLocation(player_shader_id, "uTransform");
     glUniformMatrix4fv(uniform_location, 1, GL_FALSE, (transform.m));
-    glDrawElements(GL_TRIANGLES, current_index_count, GL_UNSIGNED_INT, 0);
+	// TODO: Get offsets from the vbo
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT,(void*)(0 *  sizeof(u32)));
+	// TODO: Get offsets from the vbo
+	glUseProgram(static_shader_id);
+    glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT,(void*)(6 *  sizeof(u32)));
 	
 #if SERENE_DEBUG	
 	player_tile_pos.x = (u32)player_pixel_pos.x / tile_dim;
