@@ -39,7 +39,7 @@ ConstructAssetDirectory(char *desired_path, char *asset_path, char *resource_pat
 
 #define PIXELS_PER_METER 100
 
-global u32 tile_dim = PIXELS_PER_METER;
+
 
 
 internal f32 
@@ -76,39 +76,8 @@ PixelsToMeters(v3 vec3_in_pixels)
 	return(Result);
 }
 
-#define TILE_DIMM PIXELS_PER_METER
 #define TILE_COUNT_X 16
 #define TILE_COUNT_Y 9
-
-global u32 TileMap01[TILE_COUNT_Y][TILE_COUNT_X]
-{
-	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1},
-	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0}
-};
-
-global u32 TileMap02[TILE_COUNT_Y][TILE_COUNT_X]
-{
-	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1},
-	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
-	{0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0}
-};
-
-// uniform mat4 uClipMatrix;
-// uniform mat4 uModelMatrix;
-// uniform mat4 uViewMatrix;
 
 global char *player_shader_text = R"(
 	##VERTEX
@@ -161,6 +130,7 @@ struct OpenGLShader
 	char Fragment[MAX_STRING_SIZE];
 };
 
+global u32 tile_dim = PIXELS_PER_METER;
 global OpenGLShader player_shader;
 global OpenGLShader static_shader;
 global mat4 clip_view;
@@ -369,6 +339,7 @@ struct QuadVertex
 global u32 current_index_count = 0;
 global QuadVertex *vertex_buffer_base;
 global QuadVertex *vertex_buffer_current;
+global u32 *index_buffer_base;
 
 global mat4 view_to_clip = InitMatrix();
 global mat4 model_to_view = InitMatrix();
@@ -385,24 +356,35 @@ global u32 shaderProgram;
 global u32 player_shader_id;
 global u32 static_shader_id;
 
+global MemoryIndex max_quad_count = 10000;
+global MemoryIndex max_vertex_count = max_quad_count * 4;
+global MemoryIndex max_index_count = max_quad_count * 6;
 global MemoryArena RendererArena;
 
 internal void
-OpenGLAddQuad(v2 quad_dim, f32 offset, QuadVertex **vertex_buffer_ptr)
+OpenGLAddQuad(v2 quad_dim, f32 start_offset, v4 quad_color, QuadVertex **vertex_buffer_ptr)
 {
     // TODO(ABDO): Handle case of full buffer
+	if(current_index_count >= max_index_count)
+	{
+
+	}
     // top right
     QuadVertex *delta_ptr = *vertex_buffer_ptr;
-    delta_ptr->Position = {quad_dim.x + offset, quad_dim.y + offset, 0.0f};
+    delta_ptr->Position = {quad_dim.x + start_offset, quad_dim.y + start_offset, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     // bottom right
-    delta_ptr->Position = {quad_dim.x + offset, offset, 0.0f};
+    delta_ptr->Position = {quad_dim.x + start_offset, start_offset, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     // bottom left
-    delta_ptr->Position = {offset, offset, 0.0f};
+    delta_ptr->Position = {start_offset, start_offset, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     //top left
-    delta_ptr->Position = {offset, quad_dim.y + offset, 0.0f};
+    delta_ptr->Position = {start_offset, quad_dim.y + start_offset, 0.0f};
+    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
     ++delta_ptr;
     
     MemoryIndex data_offset = delta_ptr - *vertex_buffer_ptr;
@@ -412,33 +394,44 @@ OpenGLAddQuad(v2 quad_dim, f32 offset, QuadVertex **vertex_buffer_ptr)
     current_index_count += 6;
 }
 
-internal void
-OpenGLAddQuad(v2 quad_dim, v4 quad_color, QuadVertex **vertex_buffer_ptr)
+typedef struct OpenGLBatchProps
 {
-    // TODO(ABDO): Handle case of full buffer
-    // top right
-    QuadVertex *delta_ptr = *vertex_buffer_ptr;
-    delta_ptr->Position = {quad_dim.x, quad_dim.y, 0.0f};
-    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
-    ++delta_ptr;
-    // bottom right
-    delta_ptr->Position = {quad_dim.x, 0.0f, 0.0f};
-    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
-    ++delta_ptr;
-    // bottom left
-    delta_ptr->Position = {0.0f, 0.0f, 0.0f};
-    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
-    ++delta_ptr;
-    //top left
-    delta_ptr->Position = {0.0f, quad_dim.y, 0.0f};
-    delta_ptr->Color = {quad_color.r, quad_color.g, quad_color.b, quad_color.a};
-    ++delta_ptr;
+	MemoryIndex max_quad_count;
+	MemoryIndex max_vertex_count;
+	MemoryIndex max_index_count;
+} OpenGLBatchProps;
+
+typedef struct OpenGLBatchData
+{
+	u32 vao;
+	u32 vbo;
+	u32 ebo;
+
+} OpenGLBatchData;
+
+//TODO: Finish pulling out batch prep
+
+internal void
+OpenGLPrepBatch(OpenGLBatchData *batch_data, OpenGLBatchProps *batch_props)
+{
+    glGenVertexArrays(1, &batch_data->vao);
+    glGenBuffers(1, &batch_data->vbo);
+    glGenBuffers(1, &batch_data->ebo);
+    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+    glBindVertexArray(batch_data->vao);
     
-    MemoryIndex data_offset = delta_ptr - *vertex_buffer_ptr;
-    *vertex_buffer_ptr += data_offset;
+    glBindBuffer(GL_ARRAY_BUFFER, batch_data->vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * batch_props->max_vertex_count, vertex_buffer_base, GL_DYNAMIC_DRAW);
     
-    // increment indices to be drawn
-    current_index_count += 6;
+	// These 2 lines will be done with each new addition to the vertex buffer
+	glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_buffer_current - vertex_buffer_base, vertex_buffer_base);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, batch_data->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * batch_props->max_index_count, index_buffer_base, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QuadVertex), (void*)OFFSETOF(QuadVertex, Position));
+	glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(QuadVertex), (void*)OFFSETOF(QuadVertex, Color));
 }
 
 extern "C" GAME_UPDATE(GameUpdate)
@@ -448,24 +441,27 @@ extern "C" GAME_UPDATE(GameUpdate)
 	GameState* State = (GameState*)Memory->PermanentStorage;
 	if(!Memory->IsInitialized)
 	{
-		MemoryIndex quad_count = 10000;
-		MemoryIndex vertex_count = quad_count * 4;
-		MemoryIndex index_count = quad_count * 6;
-		MemoryIndex renderer_arena_size = vertex_count + index_count;
+		// (IMPORTANT) This seems very wrong!!
+		OpenGLBatchProps ogl_batch_props;
+		ogl_batch_props.max_quad_count = 10000;
+		ogl_batch_props.max_vertex_count = max_quad_count * 4;
+		ogl_batch_props.max_index_count = max_quad_count * 6;
+		MemoryIndex renderer_arena_size = ogl_batch_props.max_quad_count + ogl_batch_props.max_index_count;
+
 		InitializeArena(&RendererArena, renderer_arena_size , (u8*)Memory->TransientStorage);
 		vertex_buffer_base = (QuadVertex *)RendererArena.Base;
 		vertex_buffer_current = vertex_buffer_base;
-		u32 *index_buffer_base = (u32*)vertex_buffer_base + vertex_count;
+		index_buffer_base = (u32*)vertex_buffer_base + max_vertex_count;
 		
-        OpenGLAddQuad({player_dim, player_dim}, {1.0f, 0.0f, 0.0f, 1.0f}, &vertex_buffer_current);
-        OpenGLAddQuad({100.0f, 100.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, &vertex_buffer_current);
-		OpenGLAddQuad({200.0f, 50.0f}, 500.0f, &vertex_buffer_current);
+        OpenGLAddQuad({player_dim, player_dim}, 300.0f ,  {1.0f, 0.0f, 0.0f, 1.0f}, &vertex_buffer_current);
+        OpenGLAddQuad({100.0f, 100.0f}, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f}, &vertex_buffer_current);
+		OpenGLAddQuad({200.0f, 50.0f}, 500.0f, {0.0f, 0.0f, 1.0f, 1.0f}, &vertex_buffer_current);
 		OpenGLParseShader(player_shader_text, &player_shader);
 		OpenGLParseShader(static_shader_text, &static_shader);
         
 		u32 offset = 0;
 		for(u32 index = 0;
-	    	index < index_count;
+	    	index < max_index_count;
 			index += 6)
         {
             index_buffer_base[0 + index] = 0 + offset;
@@ -474,7 +470,6 @@ extern "C" GAME_UPDATE(GameUpdate)
             index_buffer_base[3 + index] = 2 + offset;
             index_buffer_base[4 + index] = 3 + offset;
             index_buffer_base[5 + index] = 0 + offset;
-            
             offset += 4;
         }
         
@@ -483,6 +478,7 @@ extern "C" GAME_UPDATE(GameUpdate)
 		// TODO(Abdo): Do this somewhere more sensible!!
 		i32 glad_status = gladLoadGL();
 		glViewport(0, 0, renderer_dimensions->ScreenWidth, renderer_dimensions->ScreenHeight);
+#if 0		
     	glGenVertexArrays(1, &VAO);
     	glGenBuffers(1, &VBO);
     	glGenBuffers(1, &EBO);
@@ -490,27 +486,30 @@ extern "C" GAME_UPDATE(GameUpdate)
     	glBindVertexArray(VAO);
         
     	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    	glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * vertex_count, vertex_buffer_base, GL_DYNAMIC_DRAW);
+    	glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * max_vertex_count, vertex_buffer_base, GL_DYNAMIC_DRAW);
         
 		// These 2 lines will be done with each new addition to the vertex buffer
 		glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_buffer_current - vertex_buffer_base, vertex_buffer_base);
         
     	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * index_count, index_buffer_base, GL_DYNAMIC_DRAW);
+    	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * max_index_count, index_buffer_base, GL_DYNAMIC_DRAW);
     	glEnableVertexAttribArray(0);
     	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QuadVertex), (void*)OFFSETOF(QuadVertex, Position));
 		glEnableVertexAttribArray(1);
     	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(QuadVertex), (void*)OFFSETOF(QuadVertex, Color));
-        
+#else
+	OpenGLBatchData ogl_batch_data = {};
+	OpenGLPrepBatch(&ogl_batch_data, &ogl_batch_props);
+#endif        
 		player_shader_id = OpenGLCompileShader(&player_shader);	
 		static_shader_id = OpenGLCompileShader(&static_shader);	
-		glUseProgram(player_shader_id);
 
 		view_to_clip = Perspective((f32)renderer_dimensions->ScreenWidth, (f32)renderer_dimensions->ScreenHeight, 0.1f, 100.0f);
 		model_to_view = Translate({0.0f, 0.0f, -0.1f});
 		scale = Scale({1.0f, 1.0f, 1.0f});
         
 		clip_view = model_to_view * view_to_clip;
+		glUseProgram(player_shader_id);
 		uniform_location = glGetUniformLocation(player_shader_id, "uClipView");
     	glUniformMatrix4fv(uniform_location, 1, GL_FALSE, (clip_view.m));
 		glUseProgram(static_shader_id);
